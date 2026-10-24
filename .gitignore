@@ -1,0 +1,27 @@
+# Dependencies
+node_modules/
+
+# Environment / credentials — never commit; use .env.example as the template
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pfx
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Deploy tooling
+.vercel/
+.azure/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/

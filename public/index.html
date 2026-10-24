@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Restaurant Ops Diagnostics</title>
+<link rel="stylesheet" href="tokens.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="shell-bar"><span id="shell-status">Live from Azure SQL</span><button type="button" id="reload-data">↻ Reload data</button></div>
+<div id="dash-root">
+<div class="ops">
+  <header class="ops-head" id="top">
+    <div class="ops-title-row">
+      <h1>Restaurant Ops Diagnostics</h1>
+      <span class="ops-sub" id="scope-sub">—</span>
+    </div>
+    <p class="ops-takeaway" id="takeaway">—</p>
+  </header>
+
+  <div class="ops-filters" id="filters">
+    <div class="ops-f">Brand <div class="ops-ms" id="f-brand" data-source="restaurants"></div></div>
+    <div class="ops-f">City <div class="ops-ms" id="f-city" data-source="restaurants"></div></div>
+    <div class="ops-f">Outlet <div class="ops-ms" id="f-outlet" data-source="restaurants"></div></div>
+    <span class="ops-f">Period <span class="ops-seg" id="f-period" role="group" aria-label="Period">
+      <button type="button" data-v="7">7 days</button><button type="button" data-v="28">4 weeks</button><button type="button" data-v="84">12 weeks</button></span></span>
+    <span class="ops-f">Days <span class="ops-seg" id="f-daytype" role="group" aria-label="Day type">
+      <button type="button" data-v="all">All</button><button type="button" data-v="weekday">Weekday</button><button type="button" data-v="weekend">Weekend</button></span></span>
+    <button type="button" class="ops-reset" id="f-reset">Reset filters</button>
+  </div>
+
+  <!-- Causal chain: what drives what, left to right -->
+  <section class="ops-chain" id="chain" aria-label="Causal chain">
+    <div class="ops-chain-col" id="chain-input" data-go="input">
+      <h2>Input <small>what the kitchen controls</small></h2>
+      <div class="ops-kpis" id="chain-input-kpis"></div>
+    </div>
+    <div class="ops-chain-arrow"><svg viewBox="0 0 44 14"><path d="M0 7h36M30 1l7 6-7 6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>drives</span></div>
+    <div class="ops-chain-col" id="chain-output" data-go="output">
+      <h2>Output <small>what goes wrong on orders</small></h2>
+      <div class="ops-kpis" id="chain-output-kpis"></div>
+    </div>
+    <div class="ops-chain-arrow"><svg viewBox="0 0 44 14"><path d="M0 7h36M30 1l7 6-7 6" fill="none" stroke="currentColor" stroke-width="1.5"/></svg><span>shows up as</span></div>
+    <div class="ops-chain-col" id="chain-outcome" data-go="outcome">
+      <h2>Outcome <small>what the customer and P&amp;L see</small></h2>
+      <div class="ops-kpis" id="chain-outcome-kpis"></div>
+    </div>
+  </section>
+
+  <!-- Leaderboard -->
+  <section class="ops-card ops-board" id="leaderboard">
+    <div class="ops-board-head">
+      <h2>Outlet leaderboard</h2>
+      <span class="ops-note" id="lb-note">Ranked by rating. Open a row to see why: input → output → outcome, each against the network.</span>
+      <span class="ops-seg" id="lb-order" role="group" aria-label="Order" style="margin-left:auto"><button type="button" data-v="worst">Needs attention first</button><button type="button" data-v="best">Best first</button></span>
+    </div>
+    <div class="lb" id="lb">
+      <div class="lb-head">
+        <span>#</span><span>Outlet</span>
+        <button type="button" data-sort="rating">Rating</button>
+        <button type="button" data-sort="rating_n" class="hide-sm"># ratings</button>
+        <button type="button" data-sort="sale_loss" class="hide-sm">Sale loss (cancelled ₹)</button>
+        <button type="button" data-sort="refund" class="hide-sm">Refunds ₹</button>
+        <span class="hide-sm">Flags vs network</span><span></span>
+      </div>
+      <div id="lb-rows"></div>
+    </div>
+  </section>
+
+  <!-- INPUT -->
+  <section class="tier" id="input">
+    <div class="tier-head"><h2>Input</h2><p>What the kitchen controls: prep time, being online, marking food ready, handover, stock.</p></div>
+
+    <div class="grp" id="grp-kpt" data-open="1">
+      <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">KPT<small>Order placed → food marked ready</small></span><span class="grp-sum" id="sum-kpt"></span><span class="grp-avail" id="avail-kpt"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Delivery KPT <span class="n">minutes</span></h3><div class="ops-tiles" id="t-kpt"></div></div>
+          <div class="ops-card"><h3>KPT by day part <span class="n">full period · orders-weighted</span></h3><div class="ops-chart short" id="c-kpt-parts" data-source="hourly"></div></div>
+          <div class="ops-card wide"><h3>KPT by hour and weekday <span class="n">full period · darker = slower</span></h3><div class="ops-chart" id="c-kpt-heat" data-source="hourly"></div></div>
+          <div class="ops-card"><h3>Daily KPT vs network <span class="n">7-day rolling</span></h3><div class="ops-chart" id="c-kpt-line" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Peak vs off-peak KPT <span class="n">7-day rolling</span></h3><div class="ops-chart" id="c-kpt-peak" data-source="daily"></div></div>
+          <div class="ops-card"><h3>KPT bucket · orders % <span class="n">&lt;5 · 5–8 · 8–10 · &gt;10 min</span></h3><div class="ops-chart auto" id="c-kpt-bucket" data-source="kpis"></div><p class="ops-note">Bucket edges 5 / 8 / 10 min from the sheet example — to be confirmed (feed has 5-min buckets).</p></div>
+          <div class="ops-card"><h3>KPT buckets per week</h3><div class="ops-chart" id="c-kpt-weekly" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-kpt"></div>
+      </div>
+    </div>
+
+    <div class="grp" id="grp-vis" data-open="0">
+      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">Visibility<small>Online hours vs budget</small></span><span class="grp-sum" id="sum-vis"></span><span class="grp-avail" id="avail-vis"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Visibility</h3><div class="ops-tiles" id="t-vis"></div><p class="ops-note">Lost orders ≈ offline hours × average orders per online hour in the window (feed is daily, so this is an estimate, not the hour that was missed).</p></div>
+          <div class="ops-card"><h3>Online hours per day <span class="n">weekends shaded</span></h3><div class="ops-chart" id="c-vis-line" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Calendar <span class="n">red = non-operational day</span></h3><div class="ops-chart auto" id="c-vis-cal" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Estimated lost orders per week</h3><div class="ops-chart" id="c-vis-weekly" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-vis"></div>
+      </div>
+    </div>
+
+    <div class="grp" id="grp-mfr" data-open="0">
+      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">MFR &amp; handover<small>Mark food ready · rider pickup</small></span><span class="grp-sum" id="sum-mfr"></span><span class="grp-avail" id="avail-mfr"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>MFR accuracy</h3><div class="ops-tiles" id="t-mfr"></div></div>
+          <div class="ops-card"><h3>Handover <span class="n">rider arrival → pickup · ideal 3 min</span></h3><div class="ops-tiles" id="t-handover"></div></div>
+          <div class="ops-card"><h3>Correct MFR by day part <span class="n">full period</span></h3><div class="ops-chart short" id="c-mfr-parts" data-source="hourly"></div></div>
+          <div class="ops-card"><h3>Handover by day part <span class="n">full period · minutes</span></h3><div class="ops-chart short" id="c-ho-parts" data-source="hourly"></div></div>
+          <div class="ops-card"><h3>Correct MFR % per day <span class="n">7-day rolling vs network</span></h3><div class="ops-chart" id="c-mfr-line" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Handover minutes per day <span class="n">7-day rolling · 3-min reference</span></h3><div class="ops-chart" id="c-ho-line" data-source="daily"></div></div>
+          <div class="ops-card wide"><h3>Who waits for whom <span class="n">share of orders · 7-day rolling</span></h3><div class="ops-chart" id="c-wait-line" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-mfr"></div>
+      </div>
+    </div>
+
+    <div class="grp" id="grp-oos" data-open="0">
+      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">Out of stock<small>Swiggy OOS report — not loaded</small></span><span class="grp-sum" id="sum-oos"></span><span class="grp-avail" id="avail-oos"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Proxy: 'item unavailable' cancellations <span class="n">share of cancellations</span></h3><div class="ops-tiles" id="t-oos"></div><p class="ops-note">Until the OOS report is loaded, stock-outs are only visible where they caused a cancellation.</p></div>
+        </div>
+        <div class="ops-na" id="na-oos"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OUTPUT -->
+  <section class="tier" id="output">
+    <div class="tier-head"><h2>Output</h2><p>What went wrong on orders: complaints, critical incidents, cancellations, refunds and time to deliver.</p></div>
+
+    <div class="grp" id="grp-concerns" data-open="1">
+      <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">Concerns<small>IGCC complaint orders</small></span><span class="grp-sum" id="sum-concerns"></span><span class="grp-avail" id="avail-concerns"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Category concern % <span class="n">of Swiggy orders</span></h3><div class="ops-tiles" id="t-concerns"></div></div>
+          <div class="ops-card"><h3>Product vs service <span class="n">share of complaint orders</span></h3><div class="ops-chart auto" id="c-concern-donut" data-source="kpis"></div></div>
+          <div class="ops-card"><h3>Concerns per review</h3><div class="ops-chart short" id="c-concern-split" data-source="kpis"></div><div class="ops-tiles compact" id="t-concern-count"></div></div>
+          <div class="ops-card wide"><h3>Product and service concern % per day <span class="n">7-day rolling vs network</span></h3><div class="ops-chart" id="c-concern-line" data-source="daily"></div></div>
+          <div class="ops-card"><h3>L1 issues <span class="n">% of orders · click to drill</span></h3><div class="ops-chart auto" id="c-l1" data-source="daily"></div></div>
+          <div class="ops-card"><h3 id="l2-title">L2 issues <span class="n" id="l2-sub">all L1 · weekly feed, all days</span></h3><div class="ops-chart auto" id="c-l2" data-source="complaints"></div></div>
+          <div class="ops-card"><h3>Items complained about <span class="n" id="items-sub">all L1</span></h3><div class="ops-inline"><span class="ops-chip" data-items="same" aria-pressed="true">By item</span><span class="ops-chip" data-items="category" aria-pressed="false">By menu category</span><span id="items-note">share = complaints ÷ all complaints on that item</span></div><div class="ops-chart auto" id="c-items" data-source="item_issues"></div></div>
+          <div class="ops-card"><h3>Product vs service per week</h3><div class="ops-chart" id="c-concern-weekly" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-concerns"></div>
+      </div>
+    </div>
+
+    <div class="grp" id="grp-critical" data-open="0">
+      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">Critical concerns<small>Veg/non-veg · foreign particle · pests</small></span><span class="grp-sum" id="sum-critical"></span><span class="grp-avail" id="avail-critical"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Critical incidents <span class="n">count · % of orders</span></h3><div class="ops-crit" id="t-critical"></div><p class="ops-note">Keyword-classified from L1/L2 and comments. 'Contaminated Food' L2 is counted as foreign particle pending your decision.</p></div>
+          <div class="ops-card"><h3>Share of all critical concerns</h3><div class="ops-chart auto" id="c-crit-donut" data-source="kpis"></div></div>
+          <div class="ops-card wide"><h3>Critical incidents per week</h3><div class="ops-chart" id="c-crit-weekly" data-source="daily"></div></div>
+          <div class="ops-card wide"><h3>Items with critical concerns <span class="n">by item · weekly feed</span></h3><div class="ops-chart auto" id="c-crit-items" data-source="item_issues"></div></div>
+        </div>
+        <div class="ops-na" id="na-critical"></div>
+      </div>
+    </div>
+
+    <div class="grp" id="grp-cancel" data-open="0">
+      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">RDC cancellation<small>Restaurant-side cancellations</small></span><span class="grp-sum" id="sum-cancel"></span><span class="grp-avail" id="avail-cancel"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Cancelled and completed</h3><div class="ops-tiles" id="t-cancel"></div></div>
+          <div class="ops-card"><h3>Reason % <span class="n">of cancellations · weekly feed</span></h3><div class="ops-chart auto" id="c-cancel-reasons" data-source="cancellations"></div><p class="ops-note">'Item unavailable' doubles as the out-of-stock proxy until the Swiggy OOS report is loaded.</p></div>
+          <div class="ops-card"><h3>Cancelled by</h3><div class="ops-chart auto" id="c-cancel-donut" data-source="cancellations"></div></div>
+          <div class="ops-card wide"><h3>Cancelled % per day <span class="n">7-day rolling vs network</span></h3><div class="ops-chart" id="c-cancel-line" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Cancellations by group per week</h3><div class="ops-chart" id="c-cancel-weekly" data-source="cancellations"></div></div>
+          <div class="ops-card"><h3>Items in cancelled orders <span class="n">count · share</span></h3><div class="ops-chart auto" id="c-cancel-items" data-source="item_cancels"></div></div>
+        </div>
+        <div class="ops-na" id="na-cancel"></div>
+      </div>
+    </div>
+
+    <div class="grp" id="grp-refund" data-open="0">
+      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">Refund<small>IGCC report</small></span><span class="grp-sum" id="sum-refund"></span><span class="grp-avail" id="avail-refund"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Refunds given</h3><div class="ops-tiles" id="t-refund"></div></div>
+          <div class="ops-card"><h3>Refund ₹ by reason <span class="n">L1 → L2 · weekly feed</span></h3><div class="ops-chart auto" id="c-refund-reasons" data-source="complaints"></div></div>
+          <div class="ops-card wide"><h3>Refund ₹ per day</h3><div class="ops-chart" id="c-refund-line" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-refund"></div>
+      </div>
+    </div>
+
+    <div class="grp" id="grp-tat" data-open="0">
+      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">TAT<small>Order placed → rider pickup</small></span><span class="grp-sum" id="sum-tat"></span><span class="grp-avail" id="avail-tat"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Actual TAT</h3><div class="ops-tiles" id="t-tat"></div><div class="ops-inline">Ideal TAT <input type="number" id="ideal-tat" min="5" max="60" step="0.5" value="18" aria-label="Ideal TAT in minutes"> min <span>— not defined in the sheet; set it here.</span></div></div>
+          <div class="ops-card wide"><h3>TAT per day vs ideal <span class="n">restaurant-side · delivered time only for complaint orders</span></h3><div class="ops-chart" id="c-tat-line" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-tat"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- OUTCOME -->
+  <section class="tier" id="outcome">
+    <div class="tier-head"><h2>Outcome</h2><p>Rating, lost sales and value given back — the result of everything above.</p></div>
+
+    <div class="grp" id="grp-rating" data-open="1">
+      <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">Rating<small>Swiggy rating feed</small></span><span class="grp-sum" id="sum-rating"></span><span class="grp-avail" id="avail-rating"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Overall rating <span class="n" id="rating-window"></span></h3><div class="ops-tiles" id="t-rating"></div><p class="ops-note">Grey when fewer than 30 ratings in the window — too few to trust.</p></div>
+          <div class="ops-card wide"><h3>Daily rating vs network <span class="n">7-day rolling · orders-weighted</span></h3><div class="ops-chart tall" id="c-rating-line" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-rating"></div>
+      </div>
+    </div>
+
+    <div class="grp" id="grp-saleloss" data-open="1">
+      <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">Sale loss<small>RDC cancellations</small></span><span class="grp-sum" id="sum-saleloss"></span><span class="grp-avail" id="avail-saleloss"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Cancelled order value</h3><div class="ops-tiles" id="t-saleloss"></div><p class="ops-note">Absolute ₹ only — % of sales needs total GMV from the payout file.</p></div>
+          <div class="ops-card wide"><h3>Cancelled value per day <span class="n">₹</span></h3><div class="ops-chart" id="c-saleloss-line" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-saleloss"></div>
+      </div>
+    </div>
+
+    <div class="grp" id="grp-guestvalue" data-open="0">
+      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">Value to guest<small>Refunds + cancellations</small></span><span class="grp-sum" id="sum-guestvalue"></span><span class="grp-avail" id="avail-guestvalue"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Restaurant → guest value</h3><div class="ops-tiles" id="t-guestvalue"></div><p class="ops-note">IGCC refunds plus cancelled order value. % of sales needs GMV.</p></div>
+          <div class="ops-card wide"><h3>Refunds and cancelled value per week</h3><div class="ops-chart" id="c-guestvalue-weekly" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-guestvalue"></div>
+      </div>
+    </div>
+  </section>
+</div>
+</div>
+<script src="/vendor/d3.min.js"></script>
+<script src="dash-shim.js"></script>
+<script src="charts.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
