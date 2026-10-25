@@ -3,6 +3,7 @@ require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const sql = require('mssql');
+const zlib = require('zlib');
 const queries = require('./src/queries');
 
 const PORT = +(process.env.PORT || 3000);
@@ -32,16 +33,19 @@ function getPool() {
 
 const cache = new Map();
 
+// Cached as serialized JSON plus a gzip copy: the daily feed is ~20 MB of repetitive JSON, so compressing once per TTL
+// keeps both the transfer and the Free tier's CPU quota small.
 async function fetchDataset(id) {
   const q = queries[id];
   if (!q) throw Object.assign(new Error(`Unknown dataset "${id}"`), { status: 404 });
   const hit = cache.get(id);
-  if (hit && Date.now() - hit.at < TTL) return hit.rows;
+  if (hit && Date.now() - hit.at < TTL) return hit;
   const pool = await getPool();
   const result = await pool.request().query(q.sql);
-  const rows = result.recordset;
-  cache.set(id, { at: Date.now(), rows });
-  return rows;
+  const json = Buffer.from(JSON.stringify(result.recordset));
+  const entry = { at: Date.now(), json, gz: zlib.gzipSync(json, { level: 6 }) };
+  cache.set(id, entry);
+  return entry;
 }
 
 const app = express();
@@ -54,9 +58,10 @@ app.get('/api/health', async (req, res) => {
 
 app.get('/api/data/:id', async (req, res) => {
   try {
-    const rows = await fetchDataset(req.params.id);
-    res.set('Cache-Control', 'no-store');
-    res.json(rows);
+    const { json, gz } = await fetchDataset(req.params.id);
+    res.set({ 'Cache-Control': 'no-store', 'Content-Type': 'application/json; charset=utf-8', Vary: 'Accept-Encoding' });
+    if (/\bgzip\b/.test(req.headers['accept-encoding'] || '')) res.set('Content-Encoding', 'gzip').send(gz);
+    else res.send(json);
   } catch (e) {
     console.error(`[${req.params.id}]`, e.message);
     res.status(e.status || 500).json({ error: e.message });
