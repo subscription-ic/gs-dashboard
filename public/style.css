@@ -51,23 +51,9 @@
 .ops-chain-arrow svg { width: 44px; height: 14px; }
 .ops-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.5rem), 1fr)); gap: var(--cds-gap-sm) var(--cds-gap-md); }
 .ops-kpi { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.ops-kpi .lrow { display: flex; align-items: center; gap: 4px; min-width: 0; }
 .ops-kpi .l { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .ops-kpi .v { font-family: var(--font-figures); font-variant-numeric: lining-nums tabular-nums; font-weight: 600; letter-spacing: -0.01em; font-size: 1.45rem; line-height: 1.2; }
-.ops-kpi .d { cursor: default; }
 
-/* ⓘ metric explanations */
-.ops-i { flex: none; width: 15px; height: 15px; padding: 0; border-radius: 50%; border: 1px solid var(--color-border-line); background: transparent; color: var(--color-fg-muted); font: italic 600 10px/13px Georgia, serif; cursor: pointer; }
-.ops-i:hover, .ops-i:focus-visible { color: var(--color-fg); border-color: var(--color-fg-muted); }
-.ops-pop { position: absolute; z-index: 20; display: flex; flex-direction: column; gap: 6px; padding: var(--cds-pad-md); font-family: var(--font-anthropic-sans); font-size: var(--cds-font-size-caption); line-height: 1.45; color: var(--color-fg); background: var(--cds-surface-popover); border: 1px solid var(--cds-border); border-radius: var(--cds-radius); box-shadow: var(--cds-shadow-popover); }
-.ops-pop[hidden] { display: none; }
-.ops-pop h4 { margin: 0; font-size: var(--cds-font-size-body); font-weight: 600; }
-.ops-pop p { margin: 0; }
-.ops-pop dl { margin: 0; display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; }
-.ops-pop dt { color: var(--color-fg-muted); }
-.ops-pop dd { margin: 0; }
-.ops-pop code { font-family: ui-monospace, Consolas, monospace; font-size: 0.95em; overflow-wrap: anywhere; }
-.ops-pop-cmp { padding-top: 6px; border-top: 1px solid var(--color-border-line); }
 
 /* date range in the filter bar */
 .ops-dates { display: inline-flex; align-items: center; gap: 4px; }
