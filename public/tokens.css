@@ -20,34 +20,37 @@
   --cds-ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
 
   --color-page: #ffffff;      /* page background */
-  --color-fg: #1d2129;
-  --color-fg-muted: #5f6672;
-  --color-bg: #f4f5f7;        /* light fills: inputs, inner cards, hover */
+  --color-fg: #111827;
+  --color-fg-muted: #4b5563;
+  --color-bg: #f3f4f6;        /* light fills: inputs, inner cards, hover */
   --color-panel: #ffffff;     /* cards */
-  --color-border-line: #e2e5ea;
-  --color-ok: #1f7a4d;
-  --color-warn: #b7791f;
-  --color-bad: #c0392b;
-  --color-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
+  --color-border-line: #e5e7eb;
+  --color-accent: #4f46e5;    /* active tab, selected buttons */
+  --color-accent-soft: #eef2ff;
+  /* status: *-text is dark enough to read on white, *-dot is the bright mark, *-soft the pill fill */
+  --color-ok: #15803d;   --color-ok-dot: #22c55e;   --color-ok-soft: #dcfce7;
+  --color-warn: #b45309; --color-warn-dot: #f59e0b; --color-warn-soft: #fef3c7;
+  --color-bad: #dc2626;  --color-bad-dot: #ef4444;  --color-bad-soft: #fee2e2;
+  --color-shadow: 0 1px 3px rgba(16, 24, 40, 0.08), 0 1px 2px rgba(16, 24, 40, 0.04);
 
-  --cds-text-secondary: #5f6672;
-  --cds-border: #e2e5ea;
+  --cds-text-secondary: #4b5563;
+  --cds-border: #e5e7eb;
   --cds-surface-popover: #ffffff;
   --cds-shadow-popover: 0 8px 24px rgba(16, 24, 40, 0.12);
 
-  --cds-chart-1: #c96a3b;   /* accent */
-  --cds-chart-2: #3f6fb5;
-  --cds-chart-3: #2f8f6b;
-  --cds-chart-4: #c23b4a;
-  --cds-chart-5: #8a5bbf;
-  --cds-chart-6: #d9a02b;
-  --cds-chart-7: #4e8f9c;
-  --cds-chart-8: #7d7d7d;
+  --cds-chart-1: #f97316;   /* outcome · accent */
+  --cds-chart-2: #2563eb;   /* output */
+  --cds-chart-3: #16a34a;   /* input */
+  --cds-chart-4: #e11d48;
+  --cds-chart-5: #7c3aed;
+  --cds-chart-6: #f59e0b;
+  --cds-chart-7: #0891b2;
+  --cds-chart-8: #64748b;
   --cds-chart-muted: #c3c8d0;
   --cds-chart-grid: #eceef2;
   --cds-chart-axis: #b4bac4;
   --cds-chart-reference: #8f96a3;
-  --cds-chart-status-critical: #c0392b;
+  --cds-chart-status-critical: #ef4444;
 }
 
 html, body { margin: 0; background: var(--color-page); color: var(--color-fg); }
