@@ -19,6 +19,9 @@ yarn-error.log*
 .vercel/
 .azure/
 
+# Saved dataset snapshots (server.js CACHE_DIR)
+.cache/
+
 # OS / editor
 .DS_Store
 Thumbs.db

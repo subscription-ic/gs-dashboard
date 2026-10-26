@@ -15,24 +15,45 @@
   function notify() {
     if (notifyQueued) return;
     notifyQueued = true;
-    requestAnimationFrame(() => { notifyQueued = false; listeners.forEach((fn) => { try { fn(); } catch (e) { console.error('onData', e); } }); });
+    requestAnimationFrame(() => { notifyQueued = false; showStatus(); listeners.forEach((fn) => { try { fn(); } catch (e) { console.error('onData', e); } }); });
   }
 
-  async function load(id) {
-    datasets[id] = { status: 'loading', data: [], columns: [], refreshing: false };
+  // fresh: ask the server to re-query SQL. A stale (saved) answer is shown at once and followed by a fresh one.
+  // Failures (app or database still waking up) are retried a few times before the page gives up.
+  async function load(id, { fresh = false, attempt = 0 } = {}) {
+    const prev = datasets[id];
+    if (prev && prev.status === 'ok') prev.refreshing = true;
+    else datasets[id] = { status: 'loading', data: [], columns: [], refreshing: false, waking: attempt > 0 };
     notify();
     try {
-      const r = await fetch('/api/data/' + encodeURIComponent(id), { cache: 'no-store' });
+      const r = await fetch('/api/data/' + encodeURIComponent(id) + (fresh ? '?fresh=1' : ''), { cache: 'no-store' });
       const body = await r.json();
       if (!r.ok) throw new Error(body.error || r.statusText);
       const rows = Array.isArray(body) ? body : body.rows || body.data || [];
-      datasets[id] = { status: 'ok', data: rows, columns: rows.length ? Object.keys(rows[0]) : [], refreshing: false };
+      const stale = r.headers.get('X-Data-Stale') === '1';
+      datasets[id] = { status: 'ok', data: rows, columns: rows.length ? Object.keys(rows[0]) : [], refreshing: stale, asOf: r.headers.get('X-Data-As-Of') };
+      if (stale) load(id, { fresh: true });
     } catch (e) {
-      datasets[id] = { status: 'error', data: [], columns: [], message: e.message, refreshing: false };
       console.error(`dataset ${id}:`, e.message);
+      if (prev && prev.status === 'ok') prev.refreshing = false;
+      else if (attempt < 4) { setTimeout(() => load(id, { fresh, attempt: attempt + 1 }), 5000 * (attempt + 1)); datasets[id].waking = true; notify(); return; }
+      else datasets[id] = { status: 'error', data: [], columns: [], message: e.message, refreshing: false };
     }
     recompute();
     notify();
+  }
+
+  const when = (iso) => new Date(iso).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+  function showStatus() {
+    const el = document.getElementById('shell-status');
+    const all = Object.values(datasets);
+    if (!el || !all.length) return;
+    const ok = all.filter((d) => d.status === 'ok'), oldest = ok.map((d) => d.asOf).filter(Boolean).sort()[0];
+    el.textContent = all.some((d) => d.status === 'loading' && d.waking) ? 'Waking up the database — this can take a minute…'
+      : all.some((d) => d.status === 'loading') ? 'Loading data…'
+      : all.some((d) => d.status === 'error') ? 'Some data could not be loaded — try ↻ Reload data'
+      : all.some((d) => d.refreshing) ? `Showing data saved ${oldest ? when(oldest) : ''} · refreshing…`
+      : `Live from Azure SQL${oldest ? ' · updated ' + when(oldest) : ''}`;
   }
 
   function recompute() {
@@ -71,6 +92,6 @@
   // Toolbar: reload data from SQL (clears the server cache first)
   document.addEventListener('DOMContentLoaded', () => {
     const b = document.getElementById('reload-data');
-    if (b) b.addEventListener('click', async () => { b.disabled = true; try { await fetch('/api/refresh', { method: 'POST' }); } catch (e) {} Object.keys(datasets).forEach(load); b.disabled = false; });
+    if (b) b.addEventListener('click', async () => { b.disabled = true; await Promise.all(Object.keys(datasets).map((id) => load(id, { fresh: true }))); b.disabled = false; });
   });
 })();
