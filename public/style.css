@@ -266,7 +266,7 @@
 .lb-name { font-weight: 600; }
 .lb-name small { font-weight: 400; }
 .lb-rank { display: inline-flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--color-bg); font-weight: 700; color: var(--color-fg-muted); }
-.lb-rating .v { font-weight: 400; font-size: var(--cds-font-size-body); }
+.lb-rating .v { font-weight: 600; font-size: var(--cds-font-size-body); }
 .lb-d .good { color: var(--color-ok); font-weight: 600; } .lb-d .poor { color: var(--color-bad); font-weight: 600; }
 .lb-stars { color: var(--color-warn-dot); }
 .lb-drivers span { font-weight: 600; }
