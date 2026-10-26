@@ -207,21 +207,21 @@
 
 /* ---------- visual polish: bolder type, brighter accents, highlighted changes ---------- */
 /* headings: bold sans instead of light serif */
-.ops-head h1 { font-family: var(--font-anthropic-sans); font-weight: 800; font-size: 1.7rem; letter-spacing: -0.02em; }
+.ops-head h1 { font-family: var(--font-anthropic-sans); font-weight: 600; font-size: 1.6rem; letter-spacing: -0.01em; }
 .ops-sub { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; background: var(--color-accent-soft); color: var(--color-accent); font-weight: 600; }
-.tier-head h2, .ops-board-head h2 { font-family: var(--font-anthropic-sans); font-weight: 800; font-size: 1.35rem; letter-spacing: -0.01em; }
+.tier-head h2, .ops-board-head h2 { font-family: var(--font-anthropic-sans); font-weight: 600; font-size: 1.3rem; }
 .tier-head { border-left-width: 5px; }
 .tier-head p { font-size: var(--cds-font-size-body); }
-.ops-card h3 { font-weight: 700; }
+.ops-card h3 { font-weight: 600; }
 .ops-card h3 .n { font-weight: 500; }
-.grp-name { font-weight: 700; }
+.grp-name { font-weight: 600; }
 .grp-head { padding-block: var(--cds-pad-md); }
 .grp[data-open="1"] { border-color: color-mix(in srgb, var(--tier, var(--color-border-line)) 35%, var(--color-border-line)); }
 
 /* tabs: accent underline and tint */
-.ops-tabs button { font-weight: 600; border-radius: 8px 8px 0 0; }
+.ops-tabs button { font-weight: 500; border-radius: 8px 8px 0 0; }
 .ops-tabs button:hover { background: var(--color-bg); }
-.ops-tabs button[aria-selected=true] { color: var(--color-accent); font-weight: 700; border-bottom: 3px solid var(--color-accent); background: var(--color-accent-soft); }
+.ops-tabs button[aria-selected=true] { color: var(--color-accent); font-weight: 600; border-bottom: 3px solid var(--color-accent); background: var(--color-accent-soft); }
 .ops-tabs button[aria-selected=true] .ops-tab-n { background: var(--color-accent); color: #fff; }
 .ops-tab-dot { width: 9px; height: 9px; }
 
@@ -242,7 +242,7 @@
 /* causal chain: tinted header per tier */
 .ops-chain-col { border-top-width: 4px; background: linear-gradient(180deg, color-mix(in srgb, var(--tier) 9%, #fff) 0, #fff 88px); }
 .ops-chain-col:hover { border-color: var(--tier); box-shadow: 0 4px 14px rgba(16, 24, 40, 0.10); }
-.ops-chain-col h2 { font-size: 1.1rem; font-weight: 800; color: var(--tier); }
+.ops-chain-col h2 { font-size: 1.05rem; font-weight: 600; color: var(--tier); }
 .ops-chain-col h2 small { color: var(--color-fg-muted); font-weight: 500; }
 .ops-chain-arrow { font-weight: 600; }
 
@@ -266,7 +266,7 @@
 .lb-name { font-weight: 600; }
 .lb-name small { font-weight: 400; }
 .lb-rank { display: inline-flex; align-items: center; justify-content: center; width: 1.6rem; height: 1.6rem; border-radius: 50%; background: var(--color-bg); font-weight: 700; color: var(--color-fg-muted); }
-.lb-rating .v { font-weight: 800; }
+.lb-rating .v { font-weight: 400; font-size: var(--cds-font-size-body); }
 .lb-d .good { color: var(--color-ok); font-weight: 600; } .lb-d .poor { color: var(--color-bad); font-weight: 600; }
 .lb-stars { color: var(--color-warn-dot); }
 .lb-drivers span { font-weight: 600; }
@@ -275,7 +275,7 @@
 .lb-row:hover { background: #f9fafb; }
 .lb-row[aria-expanded=true] { background: var(--color-accent-soft); }
 .lb-tier { background: linear-gradient(180deg, color-mix(in srgb, var(--tier) 8%, #fff) 0, #fff 60px); }
-.lb-tier h4 { font-size: var(--cds-font-size-body); font-weight: 700; color: var(--tier); }
+.lb-tier h4 { font-size: var(--cds-font-size-body); font-weight: 600; color: var(--tier); }
 .lb-m .n { color: #374151; }
 .lb-m .v { font-weight: 700; }
 .lb-actions button { font-weight: 600; border-color: var(--color-accent); color: var(--color-accent); }
