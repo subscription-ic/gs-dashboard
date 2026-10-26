@@ -135,7 +135,7 @@
     svg.append('g').attr('transform', `translate(${cx},${cy})`).selectAll('path').data(pie).join('path').attr('d', arc).attr('fill', (d) => d.data.color)
       .on('mousemove', (ev, d) => { const [mx, my] = d3.pointer(ev, svg.node()); t.innerHTML = `<div class="ops-tip-h">${d.data.label}</div><div><b>${d3.format(',')(d.data.value)}</b> · ${d3.format('.1%')(d.data.value / total)}</div>`; placeTip(el, t, mx, my); })
       .on('mouseleave', () => { t.hidden = true; });
-    svg.append('text').attr('x', cx).attr('y', cy + 5).attr('text-anchor', 'middle').attr('font-size', 15).attr('font-family', 'var(--font-anthropic-serif)').attr('fill', 'var(--color-fg)').text(d3.format(',')(total));
+    svg.append('text').attr('x', cx).attr('y', cy + 5).attr('text-anchor', 'middle').attr('font-size', 15).attr('font-family', 'var(--font-figures)').attr('font-weight', 600).attr('fill', 'var(--color-fg)').text(d3.format(',')(total));
     const lg = svg.append('g').attr('transform', `translate(${cx + r + 16},${cy - parts.length * 9 + 4})`);
     parts.forEach((p, i) => {
       const row = lg.append('g').attr('transform', `translate(0,${i * 18})`);

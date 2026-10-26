@@ -3,6 +3,8 @@
   color-scheme: light dark;
   --font-anthropic-sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
   --font-anthropic-serif: "Source Serif 4", "Georgia", "Times New Roman", serif;
+  /* numbers: a sans with even-height, fixed-width digits (Georgia's old-style digits jump up and down) */
+  --font-figures: "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Roboto, Arial, sans-serif;
 
   --cds-font-size-caption: 0.78rem;
   --cds-font-size-body: 0.92rem;

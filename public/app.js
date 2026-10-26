@@ -77,15 +77,18 @@
     };
   }
 
-  /* Headline KPIs for one scope's daily rows over the last `period` days to `end`, for one day type, with the prior period and its change. */
+  /* Headline KPIs for one scope's daily rows over the `period` days ending `end`, for one day type, with the prior period
+     (the same number of days just before) and its change. prior_cover = prior orders ÷ current orders: low when the prior
+     window is missing order data, which makes its % comparisons unreliable. */
   function kpiFor(rows, end, period, daytype) {
     const N = (x) => +x || 0, r2 = (v) => Math.round(v * 100) / 100;
     const dt = (r) => daytype === 'all' || (daytype === 'weekend') === (N(r.is_weekend) === 1);
-    const cur = kpiAgg(rows.filter((r) => dt(r) && dayNum(r.day) > end - period));
+    const cur = kpiAgg(rows.filter((r) => dt(r) && dayNum(r.day) > end - period && dayNum(r.day) <= end));
     const prevRows = rows.filter((r) => dt(r) && dayNum(r.day) > end - 2 * period && dayNum(r.day) <= end - period);
     const prev = prevRows.length ? kpiAgg(prevRows) : null;
     const row = Object.assign({ period, daytype }, cur);
     for (const k of KPI_DELTAS) { row[k + '_prev'] = prev ? prev[k] : null; row[k + '_d'] = prev && cur[k] != null && prev[k] != null ? r2(cur[k] - prev[k]) : null; }
+    row.prior_cover = prev && cur.orders ? prev.orders / cur.orders : null;
     return row;
   }
 
@@ -122,11 +125,11 @@
     return out;
   }
 
-  /* Cancellations per reason and per cancel group (RDC_RCC, RDC_OOS, Tech, FXM, Other) for one scope's rows over the last
-     `period` days to `end`, with each one’s share of all cancellations in that cut. Weekly feed, so a period takes whole weeks. */
-  function cancelMix(rows, end, period) {
+  /* Cancellations per reason and per cancel group (RDC_RCC, RDC_OOS, Tech, FXM, Other) for one scope's rows in the weeks
+     `inWeeks` keeps, with each one’s share of all cancellations in that cut. Weekly feed, so a period takes whole weeks. */
+  function cancelMix(rows, inWeeks, period) {
     const N = (x) => +x || 0, r1 = (v) => Math.round(v * 10) / 10;
-    const inPeriod = rows.filter((r) => dayNum(r.week) > end - period);
+    const inPeriod = rows.filter((r) => inWeeks(dayNum(r.week)));
     const total = inPeriod.reduce((a, r) => a + N(r.orders), 0);
     const out = [];
     for (const level of ['reason', 'cancel_group']) {
@@ -144,7 +147,7 @@
   /* ---------- state ---------- */
   const state = { l1: null, itemsMode: 'same', lbSort: 'rating', lbOrder: 'worst', open: new Set(), ideal: 18 };
   let restaurants = [], byId = {};
-  const params = () => { const p = dash.params(); return { brand: p.brand || [], city: p.city || [], outlet: p.outlet || [], period: +(p.period || 28), daytype: p.daytype || 'all' }; };
+  const params = () => { const p = dash.params(); return { brand: p.brand || [], city: p.city || [], outlet: p.outlet || [], period: +(p.period || 28), daytype: p.daytype || 'all', from: p.from || '', to: p.to || '' }; };
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
   /* Brand / city / outlet filters: any picked value within a filter, every filter together; nothing picked = no limit.
@@ -179,10 +182,62 @@
     dash.setParams({ brand: p.brand, city: p.city, outlet: p.outlet });
   }
 
+  /* ---------- metric definitions: what each tile shows, how it is calculated and from which table.column ----------
+     t = tier, n = name, w = what it means, f = formula, s = source. "Orders" always means every fact_orders row
+     (delivered + cancelled); time metrics use delivered orders only. Feeds are dated by order_date, concern_date,
+     rating_date, avail_date and mfr_date. One entry feeds both the ⓘ popover and the Metric guide table. */
+  const ORDERS_W = 'Each outlet-day\'s average is weighted by that day\'s orders, so busy days count more.';
+  const MI = {
+    kpt: { t: 'Input', n: 'KPT', w: 'Average kitchen prep time: order placed → food marked ready.', f: 'Σ(daily avg KPT × orders) ÷ Σ orders. Daily avg = AVG(kpt_min) of delivered orders. ' + ORDERS_W, s: 'fact_orders.kpt_min' },
+    kpt_peak: { t: 'Input', n: 'KPT, peak hours', w: 'KPT for orders placed 12:00–14:59 and 19:00–21:59.', f: 'As KPT, only delivered orders with is_peak_hour = 1.', s: 'fact_orders.kpt_min, is_peak_hour' },
+    kpt_offpeak: { t: 'Input', n: 'KPT, off-peak', w: 'KPT for orders outside peak hours.', f: 'As KPT, only delivered orders with is_peak_hour = 0.', s: 'fact_orders.kpt_min, is_peak_hour' },
+    kpt_gt10_pct: { t: 'Input', n: 'Orders over 10 min', w: 'Share of orders whose prep took 10 minutes or more.', f: 'Delivered orders with kpt_min ≥ 10 ÷ all orders × 100.', s: 'fact_orders.kpt_min' },
+    vis_pct: { t: 'Input', n: 'Visibility', w: 'How much of its planned time the outlet was online on Swiggy.', f: 'Σ actual_open_hrs ÷ Σ ideal_open_hrs × 100.', s: 'fact_availability_daily.actual_open_hrs, ideal_open_hrs' },
+    nonop_days: { t: 'Input', n: 'Non-operational days', w: 'Outlet-days with no online time at all.', f: 'Count of outlet-days in the window with actual_open_hrs = 0 (or no availability row that day).', s: 'fact_availability_daily.actual_open_hrs' },
+    offline_hours: { t: 'Input', n: 'Offline hours', w: 'Planned hours the outlet was not online.', f: 'Σ ideal_open_hrs − Σ actual_open_hrs.', s: 'fact_availability_daily' },
+    est_lost_orders: { t: 'Input', n: 'Est. orders lost', w: 'Orders the outlet would likely have taken while offline.', f: 'Offline hours × (orders ÷ online hours).', s: 'fact_availability_daily, fact_orders' },
+    est_lost_value: { t: 'Input', n: 'Est. value lost', w: '₹ value of the estimated lost orders.', f: 'Est. orders lost × average cancelled order value (Σ cancelled_gmv ÷ cancelled orders), used as a stand-in for order value.', s: 'fact_availability_daily, fact_orders.cancelled_gmv' },
+    mfr_correct_pct: { t: 'Input', n: 'Correct MFR', w: 'How often food was marked ready correctly (Mark Food Ready).', f: 'Swiggy\'s daily correct-MFR % per outlet; where Swiggy has no figure for a day, the share of delivered orders marked ready before the rider arrived. ' + ORDERS_W, s: 'fact_mfr_daily.correct_mfr_pct_swiggy (fallback fact_orders.mfr_before_arrival)' },
+    mfr_incorrect_pct: { t: 'Input', n: 'Incorrect MFR', w: 'The rest of Correct MFR.', f: '100 − Correct MFR %.', s: 'fact_mfr_daily.correct_mfr_pct_swiggy' },
+    mfr_not_marked_pct: { t: 'Input', n: 'MFR not marked', w: 'Orders where food ready was never marked.', f: 'Delivered orders with mfr_not_marked = 1 ÷ delivered orders × 100. ' + ORDERS_W, s: 'fact_orders.mfr_not_marked' },
+    handover: { t: 'Input', n: 'Handover', w: 'Minutes from rider arriving at the outlet to picking up the order.', f: 'AVG(handover_min) of delivered orders. ' + ORDERS_W, s: 'fact_orders.handover_min' },
+    handover_dev: { t: 'Input', n: 'Deviation from 3 min', w: 'How far average handover is above the 3-minute ideal.', f: 'Handover − 3.', s: 'fact_orders.handover_min' },
+    over3_pct: { t: 'Input', n: 'Orders over 3 min', w: 'Share of orders where the rider waited more than 3 minutes.', f: 'Delivered orders with handover_over_3min = 1 ÷ delivered orders with a handover time × 100.', s: 'fact_orders.handover_over_3min' },
+    wait_arr_pct: { t: 'Input', n: 'Rider waited after arrival', w: 'Same measure as Orders over 3 min: the rider waited more than 3 minutes after arriving.', f: 'Delivered orders with handover_over_3min = 1 ÷ delivered orders with a handover time × 100.', s: 'fact_orders.handover_over_3min' },
+    food_wait_pct: { t: 'Input', n: 'Food waited after MFR', w: 'Share of orders where food was ready before the rider arrived (food sat waiting).', f: 'Delivered orders with mfr_before_arrival = 1 ÷ delivered orders × 100.', s: 'fact_orders.mfr_before_arrival' },
+    food_wait_min: { t: 'Input', n: 'Food wait minutes', w: 'How long ready food waited for the rider.', f: 'AVG(food_wait_min) on orders where food was ready before the rider arrived.', s: 'fact_orders.food_wait_min' },
+    product_pct: { t: 'Output', n: 'Product concern', w: 'Orders with a food complaint (quality, quantity).', f: 'Complaint orders with a Product concern ÷ all orders × 100. A complaint order counts once however many lines it has.', s: 'fact_concerns.concern_category = \'Product\' ÷ fact_orders' },
+    service_pct: { t: 'Output', n: 'Service concern', w: 'Orders with a service complaint (packaging, missing, wrong item).', f: 'Complaint orders with a Service concern ÷ all orders × 100, counted once per order.', s: 'fact_concerns.concern_category = \'Service\' ÷ fact_orders' },
+    complaint_pct: { t: 'Output', n: 'Any concern', w: 'Orders with any complaint.', f: 'Complaint orders ÷ all orders × 100.', s: 'fact_concerns.order_id ÷ fact_orders' },
+    complaints: { t: 'Output', n: 'Complaint orders', w: 'Number of orders with at least one complaint.', f: 'Distinct complaint orders, by concern date.', s: 'fact_concerns.order_id' },
+    unique: { t: 'Output', n: 'Unique concern orders', w: 'Complaint orders about one kind of issue.', f: 'Complaint orders with exactly one distinct L1 issue.', s: 'fact_concerns.l1_issue' },
+    unique_pct: { t: 'Output', n: 'Unique %', w: 'Single-issue complaint orders as a share of all orders.', f: 'Unique concern orders ÷ all orders × 100.', s: 'fact_concerns.l1_issue ÷ fact_orders' },
+    multi: { t: 'Output', n: 'Multiple concern orders', w: 'Complaint orders about more than one kind of issue.', f: 'Complaint orders with more than one distinct L1 issue.', s: 'fact_concerns.l1_issue' },
+    multi_pct: { t: 'Output', n: 'Multiple %', w: 'Multi-issue complaint orders as a share of all orders.', f: 'Multiple concern orders ÷ all orders × 100.', s: 'fact_concerns.l1_issue ÷ fact_orders' },
+    crit_total: { t: 'Output', n: 'Critical incidents', w: 'Complaints about veg/non-veg mix-ups, foreign particles or pests.', f: 'Orders tagged Veg/Non-veg + Foreign particle + Pests. Each type is counted per order, so an order with two critical types counts twice.', s: 'fact_concerns.critical_type' },
+    cancel_pct: { t: 'Output', n: 'Cancelled', w: 'Share of orders cancelled on the restaurant side (RDC).', f: 'Orders with is_cancelled = 1 ÷ all orders × 100.', s: 'fact_orders.is_cancelled' },
+    completion_pct: { t: 'Output', n: 'Order completion', w: 'Share of orders not cancelled.', f: '100 − Cancelled %.', s: 'fact_orders.is_cancelled' },
+    cancelled: { t: 'Output', n: 'Cancelled orders', w: 'Number of cancelled orders.', f: 'Count of orders with is_cancelled = 1.', s: 'fact_orders.is_cancelled' },
+    top_reason: { t: 'Output', n: 'Top cancellation reason', w: 'The most common cancellation reason and its share.', f: 'Cancellations with that reason ÷ all cancellations × 100, over whole weeks (weekly feed).', s: 'fact_orders.cancel_reason' },
+    oos_share: { t: 'Input', n: "'Item unavailable' share", w: 'Stand-in for stock-outs until the Swiggy OOS report is loaded.', f: 'Cancellations in group RDC_OOS ÷ all cancellations × 100, over whole weeks.', s: 'fact_orders.cancel_l2 = \'RDC_OOS\'' },
+    oos_orders: { t: 'Input', n: 'OOS-tagged cancellations', w: 'Number of cancellations tagged item unavailable.', f: 'Count of cancellations with cancel_l2 = RDC_OOS, over whole weeks.', s: 'fact_orders.cancel_l2' },
+    tat: { t: 'Output', n: 'TAT', w: 'Restaurant turnaround: order placed → rider pickup (not delivery).', f: 'AVG(order_to_pickup_min) of delivered orders. ' + ORDERS_W, s: 'fact_orders.order_to_pickup_min' },
+    refund: { t: 'Output', n: 'Refunds', w: 'Money refunded to customers on complaints (IGCC).', f: 'Σ refund per complaint order. The table repeats an order\'s refund on each of its lines, so it is taken once per order.', s: 'fact_concerns.refund_order' },
+    rating: { t: 'Outcome', n: 'Rating', w: 'Average customer rating.', f: 'Average of every rating received in the window = Σ(daily avg × ratings) ÷ Σ ratings. Grey when fewer than 30 ratings.', s: 'fact_ratings.rating' },
+    rating_n: { t: 'Outcome', n: 'Ratings', w: 'How many ratings were received.', f: 'Count of ratings, by rating date.', s: 'fact_ratings' },
+    sale_loss: { t: 'Outcome', n: 'Sale loss', w: 'Value of orders lost to cancellation.', f: 'Σ cancelled_gmv of cancelled orders.', s: 'fact_orders.cancelled_gmv' },
+    guest_value: { t: 'Outcome', n: 'Value to guest', w: 'Everything given back or lost on bad orders.', f: 'Refunds + Sale loss.', s: 'fact_concerns.refund_order + fact_orders.cancelled_gmv' },
+    orders: { t: 'Outcome', n: 'Orders', w: 'All orders placed.', f: 'Count of orders, delivered + cancelled, by order date.', s: 'fact_orders' },
+  };
+  const UNIT = { kpt: ' min', kpt_peak: ' min', kpt_offpeak: ' min', handover: ' min', handover_dev: ' min', food_wait_min: ' min', tat: ' min', nonop_days: ' days', rating: '', crit_total: '' };
+  const dotRule = (k) => { const t = TH[k]; if (!t) return '—'; const u = k in UNIT ? UNIT[k] : '%'; return t[0] === 'low' ? `green ≤ ${t[1]}${u} · amber to ${t[2]}${u} · red above` : `green ≥ ${t[1]}${u} · amber to ${t[2]}${u} · red below`; };
+  const better = (k) => (GOOD[k] === 'high' ? 'Higher is better' : GOOD[k] === 'low' ? 'Lower is better' : '');
+
   /* ---------- tiles ---------- */
   function mkTile(container, spec) {
     const el = document.createElement('div'); el.className = 'ops-kpi' + (spec.small ? ' small' : '');
-    el.innerHTML = `<span class="l"></span><span class="v${spec.big ? '' : ' sm'}" data-source="${spec.source || 'kpis'}" data-field="${spec.field}">—</span>` + (spec.delta === false ? '' : `<span class="d"><span class="dv" data-source="kpis" data-field="${spec.field}_d">—</span><span class="dl"></span></span>`);
+    const info = MI[spec.info || spec.field] && !container.closest('.grp-head');   // no button inside the group-header button
+    el.innerHTML = `<span class="lrow"><span class="l"></span>${info ? `<button type="button" class="ops-i" data-info="${spec.info || spec.field}" aria-label="How ${esc(spec.label)} is calculated">i</button>` : ''}</span><span class="v${spec.big ? '' : ' sm'}" data-source="${spec.source || 'kpis'}" data-field="${spec.field}">—</span>` + (spec.delta === false ? '' : `<span class="d"><span class="dv" data-source="kpis" data-field="${spec.field}_d">—</span><span class="dl"></span></span>`);
     el.querySelector('.l').textContent = spec.label;
     el.dataset.field = spec.field; el._spec = spec;
     container.appendChild(el);
@@ -205,7 +260,9 @@
       dv.dataset.where = vEl.dataset.where;
       dv.textContent = d == null ? '—' : (SIGNED[s.fmt] || SIGNED.num1)(d);
       dv.className = 'dv ' + deltaClass(s.field, d);
-      el.querySelector('.dl').textContent = d == null ? ' no prior period' : ' vs prior ' + PERIOD_LABEL[p.period].replace('last ', '');
+      const partial = d != null && row.prior_cover != null && row.prior_cover < 0.8;
+      el.querySelector('.dl').textContent = d == null ? ' no prior period' : ` vs ${priorLabel(p)}${partial ? ' ⚠' : ''}`;
+      el.querySelector('.d').title = d == null ? '' : `This period ${winRange(p)} vs prior ${priorRange(p)}` + (partial ? `. ⚠ The prior period has only ${Math.round(100 * row.prior_cover)}% of this period's orders (order data missing), so this comparison is unreliable.` : '');
     }
   }
 
@@ -244,14 +301,14 @@
   tiles('t-guestvalue', [{ label: 'Refunds + cancelled value', field: 'guest_value', fmt: 'inr', big: true, nostatus: true }, { label: 'IGCC refunds', field: 'refund', fmt: 'inr', nostatus: true }, { label: 'Cancelled value', field: 'sale_loss', fmt: 'inr', nostatus: true }]);
   tiles('t-concerns', [{ label: 'Product concern (quality, quantity)', field: 'product_pct', fmt: 'pct', big: true }, { label: 'Service concern (packaging, missing, wrong)', field: 'service_pct', fmt: 'pct', big: true }, { label: 'Any concern', field: 'complaint_pct', fmt: 'pct' }]);
   tiles('t-concern-count', [{ label: 'Unique concern orders', field: 'unique', fmt: 'int', nostatus: true, delta: false }, { label: 'Unique %', field: 'unique_pct', fmt: 'pct', nostatus: true }, { label: 'Multiple concern orders', field: 'multi', fmt: 'int', nostatus: true, delta: false }, { label: 'Multiple %', field: 'multi_pct', fmt: 'pct' }]);
-  tiles('t-cancel', [{ label: 'Cancelled %', field: 'cancel_pct', fmt: 'pct', big: true }, { label: 'Order completion', field: 'completion_pct', fmt: 'pct' }, { label: 'Cancelled orders', field: 'cancelled', fmt: 'int', nostatus: true, delta: false }, { label: 'Top reason', field: 'pct', fmt: 'pct', source: 'cancel_mix', level: 'reason', name: '', nostatus: true, delta: false, top: true }]);
+  tiles('t-cancel', [{ label: 'Cancelled %', field: 'cancel_pct', fmt: 'pct', big: true }, { label: 'Order completion', field: 'completion_pct', fmt: 'pct' }, { label: 'Cancelled orders', field: 'cancelled', fmt: 'int', nostatus: true, delta: false }, { label: 'Top reason', field: 'pct', info: 'top_reason', fmt: 'pct', source: 'cancel_mix', level: 'reason', name: '', nostatus: true, delta: false, top: true }]);
   tiles('t-refund', [{ label: 'Total refunded (IGCC)', field: 'refund', fmt: 'inr', big: true, nostatus: true }, { label: 'Complaint orders', field: 'complaints', fmt: 'int', nostatus: true, delta: false }]);
   tiles('t-tat', [{ label: 'Actual average TAT', field: 'tat', fmt: 'min', big: true }]);
   tiles('t-kpt', [{ label: 'Average KPT', field: 'kpt', fmt: 'min', big: true }, { label: 'Peak hours', field: 'kpt_peak', fmt: 'min' }, { label: 'Off-peak', field: 'kpt_offpeak', fmt: 'min' }, { label: 'Orders over 10 min', field: 'kpt_gt10_pct', fmt: 'pct' }]);
   tiles('t-vis', [{ label: 'Visibility (online ÷ budgeted hours)', field: 'vis_pct', fmt: 'pct', big: true }, { label: 'Non-operational days', field: 'nonop_days', fmt: 'days' }, { label: 'Offline hours', field: 'offline_hours', fmt: 'hours', nostatus: true }, { label: 'Est. orders lost', field: 'est_lost_orders', fmt: 'int', nostatus: true }, { label: 'Est. value lost', field: 'est_lost_value', fmt: 'inr', nostatus: true }]);
   tiles('t-mfr', [{ label: 'Correct MFR', field: 'mfr_correct_pct', fmt: 'pct', big: true }, { label: 'Incorrect MFR', field: 'mfr_incorrect_pct', fmt: 'pct' }, { label: 'MFR not marked', field: 'mfr_not_marked_pct', fmt: 'pct' }]);
   tiles('t-handover', [{ label: 'Average handover', field: 'handover', fmt: 'min', big: true }, { label: 'Deviation from 3 min', field: 'handover_dev', fmt: 'min' }, { label: 'Orders over 3 min', field: 'over3_pct', fmt: 'pct' }, { label: 'Rider waited after arrival', field: 'wait_arr_pct', fmt: 'pct' }, { label: 'Food waited after MFR', field: 'food_wait_pct', fmt: 'pct' }, { label: 'Food wait minutes', field: 'food_wait_min', fmt: 'min' }]);
-  tiles('t-oos', [{ label: "'Item unavailable' share of cancellations", field: 'pct', fmt: 'pct', source: 'cancel_mix', level: 'group', name: 'RDC_OOS', nostatus: true, big: true, delta: false }, { label: 'OOS-tagged cancellations', field: 'orders', fmt: 'int', source: 'cancel_mix', level: 'group', name: 'RDC_OOS', nostatus: true, delta: false }]);
+  tiles('t-oos', [{ label: "'Item unavailable' share of cancellations", field: 'pct', info: 'oos_share', fmt: 'pct', source: 'cancel_mix', level: 'group', name: 'RDC_OOS', nostatus: true, big: true, delta: false }, { label: 'OOS-tagged cancellations', field: 'orders', info: 'oos_orders', fmt: 'int', source: 'cancel_mix', level: 'group', name: 'RDC_OOS', nostatus: true, delta: false }]);
 
   // Critical badges
   const CRIT = [['veg', 'Veg / non-veg'], ['foreign', 'Foreign particle'], ['pests', 'Pests']];
@@ -277,7 +334,7 @@
   Object.entries(AVAIL).forEach(([g, [a, b]]) => { $('avail-' + g).textContent = `${a} of ${b} sub-metrics`; });
 
   /* ---------- controls ---------- */
-  const setDefaults = () => dash.setParams({ brand: [], city: [], outlet: [], period: 28, daytype: 'all' });
+  const setDefaults = () => dash.setParams({ brand: [], city: [], outlet: [], period: 28, daytype: 'all', from: '', to: '' });
 
   /* checkbox drop-down for one filter; returns update(options [{v, l, sub}], selected) */
   const CHEV = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
@@ -314,7 +371,25 @@
   const msOutlet = multiSelect('f-outlet', 'outlet', { title: 'Outlet', noun: 'outlets', search: true });
   document.addEventListener('click', (e) => { if (!e.target.closest('.ops-ms')) closeMenus(); });
   const seg = (id, name, onPick) => $(id).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; onPick ? onPick(b.dataset.v) : dash.setParams({ [name]: name === 'period' ? +b.dataset.v : b.dataset.v }); });
-  seg('f-period', 'period'); seg('f-daytype', 'daytype');
+  seg('f-period', 'period', (v) => dash.setParams({ period: +v, from: '', to: '' })); seg('f-daytype', 'daytype');
+  // custom date range: both ends needed; picking one end keeps the other from the window on screen
+  const onDate = () => { let f = $('f-from').value, t = $('f-to').value; if (!f || !t) return; if (f > t) [f, t] = [t, f]; dash.setParams({ from: f, to: t }); };
+  $('f-from').addEventListener('change', onDate); $('f-to').addEventListener('change', onDate);
+  // metric popover (ⓘ on a tile) and the guide link
+  const pop = document.createElement('div'); pop.className = 'ops-pop'; pop.hidden = true; pop.setAttribute('role', 'dialog'); document.body.appendChild(pop);
+  let popFor = null;
+  document.addEventListener('click', (e) => {
+    const b = e.target.closest('.ops-i');
+    if (e.target.closest('[data-guide]')) { pop.hidden = true; popFor = null; $('guide').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
+    if (!b) { if (!e.target.closest('.ops-pop')) { pop.hidden = true; popFor = null; } return; }
+    e.stopPropagation();   // capture phase: keeps the chain column's click-to-scroll from firing
+    if (popFor === b && !pop.hidden) { pop.hidden = true; popFor = null; return; }
+    popFor = b; pop.innerHTML = infoHtml(b.dataset.info, resolve(params())); pop.hidden = false;
+    const r = b.getBoundingClientRect(), w = Math.min(340, window.innerWidth - 32);
+    pop.style.width = w + 'px'; pop.style.left = Math.max(16, Math.min(r.left + window.scrollX - 12, window.scrollX + window.innerWidth - w - 16)) + 'px'; pop.style.top = r.bottom + window.scrollY + 6 + 'px';
+  }, true);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop.hidden) { pop.hidden = true; if (popFor) popFor.focus(); popFor = null; } });
+  $('f-guide').addEventListener('click', () => { $('guide').scrollIntoView({ behavior: 'smooth', block: 'start' }); dash.setLink('guide'); });
   seg('lb-order', 'order', (v) => { state.lbOrder = v; redraw(); });
   $('f-reset').addEventListener('click', () => { dash.resetParams(); setDefaults(); state.l1 = null; });
   $('ideal-tat').addEventListener('change', (e) => { const v = +e.target.value; if (v > 0) { state.ideal = v; redraw(); } });
@@ -335,6 +410,50 @@
   const rows = (id) => (ok(id) ? dash.data(id).data : []);
   const toDate = (n) => new Date(n * 864e5);
   const inDaytype = (r, dt) => dt === 'all' || (dt === 'weekend') === (N(r.is_weekend) === 1);
+
+  /* ---------- the date window: a preset (last 7 / 28 / 84 days to the last day of data) or a custom from–to ---------- */
+  let dataStart = 0, dataEnd = 0;   // first / last day in the daily feed, set by draw()
+  function resolve(p) {
+    const custom = !!(p.from && p.to), end = custom ? dayNum(p.to) : dataEnd;
+    const period = custom ? Math.max(1, end - dayNum(p.from) + 1) : p.period;
+    return Object.assign(p, { custom, end, period, start: end - period + 1 });
+  }
+  const isoDay = (n) => toDate(n).toISOString().slice(0, 10);
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const fmtDay = (n, year) => { const d = toDate(n); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}${year ? ' ' + d.getUTCFullYear() : ''}`; };
+  const winRange = (p) => `${fmtDay(p.start)} – ${fmtDay(p.end, true)}`;
+  const priorRange = (p) => `${fmtDay(p.start - p.period)} – ${fmtDay(p.start - 1, true)}`;
+  const winLabel = (p) => (p.custom ? `${winRange(p)} (${p.period} days)` : PERIOD_LABEL[p.period]);
+  const priorLabel = (p) => (p.custom ? `prior ${p.period} days` : 'prior ' + PERIOD_LABEL[p.period].replace('last ', ''));
+  // weekly feeds (complaints, cancellations) can only be cut by whole weeks: a preset takes the last weeks before
+  // `presetEnd`, a custom range every week it touches
+  const inWeeks = (p, presetEnd) => (w) => (p.custom ? w <= p.end && w + 6 >= p.start : w > presetEnd - p.period);
+
+  /* headline KPIs for the network and every outlet over a custom window (presets are precomputed in `kpis`) */
+  function customKpis(daily, p) {
+    const known = new Set(restaurants.map((r) => r.restaurant_id)), byOutlet = d3.group(daily, (r) => r.restaurant_id);
+    const scopes = [['all', daily.filter((r) => known.has(r.restaurant_id))], ...restaurants.map((r) => [r.restaurant_id, byOutlet.get(r.restaurant_id) || []])];
+    return scopes.map(([scope, rs]) => Object.assign({ scope }, kpiFor(rs, p.end, p.period, p.daytype)));
+  }
+
+  /* ---------- metric explanations ---------- */
+  function infoHtml(k, p) {
+    const m = MI[k]; if (!m) return '';
+    const cmp = KPI_DELTAS.includes(k) && dataEnd
+      ? `<p class="ops-pop-cmp"><b>Comparison</b> This period ${winRange(p)} vs the prior period ${priorRange(p)}: the same ${p.period} days just before, with the same filters and the same formula. Change = this period − prior${/pct$/.test(k) ? ' (in percentage points, pt)' : ''}.</p>`
+      : /^(top_reason|oos_)/.test(k) ? '<p class="ops-pop-cmp">Weekly feed: counted over whole weeks, no prior-period comparison.</p>' : '';
+    const rule = [TH[k] ? 'Dot: ' + dotRule(k) : '', better(k)].filter(Boolean).join('. ');
+    return `<h4>${esc(m.n)}</h4><p>${esc(m.w)}</p><dl><dt>Formula</dt><dd>${esc(m.f)}</dd><dt>Source</dt><dd><code>${esc(m.s)}</code></dd>${rule ? `<dt>Target</dt><dd>${rule}</dd>` : ''}</dl>${cmp}<button type="button" class="ops-link" data-guide>All metrics ↓</button>`;
+  }
+  const TIERS = ['Input', 'Output', 'Outcome'];
+  $('guide-table').innerHTML = `<table><thead><tr><th>Metric</th><th>What it shows</th><th>Formula</th><th>Source (table.column)</th><th>Target</th></tr></thead><tbody>`
+    + TIERS.map((t) => `<tr class="tier-row"><th colspan="5">${t}</th></tr>` + Object.entries(MI).filter(([, m]) => m.t === t).map(([k, m]) => `<tr><td>${esc(m.n)}</td><td>${esc(m.w)}</td><td>${esc(m.f)}</td><td><code>${esc(m.s)}</code></td><td>${[TH[k] ? dotRule(k) : '', better(k)].filter(Boolean).join('. ') || '—'}</td></tr>`).join('')).join('')
+    + '</tbody></table>';
+  function drawGuide(p, row) {
+    const partial = row && row.prior_cover != null && row.prior_cover < 0.8;
+    $('guide-cmp').innerHTML = !dataEnd ? '' : `<p><b>Right now:</b> this period is <b>${winRange(p)}</b> (${p.period} days)${p.daytype === 'all' ? '' : `, ${p.daytype}s only`}; the prior period is <b>${priorRange(p)}</b>. Data runs ${fmtDay(dataStart, true)} – ${fmtDay(dataEnd, true)}${p.start - p.period < dataStart ? ', so the prior period starts before the data does and only covers part of it' : ''}.`
+      + (partial ? ` <span class="warn">⚠ The prior period has only ${Math.round(100 * row.prior_cover)}% of this period's orders, so its comparisons (marked ⚠ on the tiles) are unreliable.</span>` : '') + '</p>';
+  }
 
   /* daily aggregate per day for a set of ids, with 7-day rolling for weighted metrics */
   function dailySeries(daily, ids, p, end, rolling = 7) {
@@ -371,11 +490,15 @@
   function redraw() { draw(); }
 
   function draw() {
-    const p = params();
+    const p = params(), daily = rows('daily');
+    [dataStart, dataEnd] = daily.length ? cached('bounds', [daily], () => d3.extent(daily, (r) => dayNum(r.day))) : [0, 0];
+    resolve(p);
     const ready = ['daily', 'restaurants', 'kpis'].every(ok);
     document.querySelectorAll('.ops-kpi .v, .ops-badge').forEach((el) => el.classList.toggle('dash-skeleton', !ready && dash.data('daily').status === 'loading'));
-    // controls reflect params
-    $('f-period').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', +b.dataset.v === p.period));
+    // controls reflect params; the date inputs always show the window on screen
+    $('f-period').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', !p.custom && +b.dataset.v === p.period));
+    $('f-dates').dataset.active = String(p.custom);
+    if (daily.length) [['f-from', p.start], ['f-to', p.end]].forEach(([id, n]) => { const i = $(id); i.min = isoDay(dataStart); i.max = isoDay(dataEnd); if (document.activeElement !== i) i.value = isoDay(n); });
     $('f-daytype').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === p.daytype));
     $('lb-order').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === state.lbOrder));
     document.querySelectorAll('[data-items]').forEach((c) => c.setAttribute('aria-pressed', c.dataset.items === state.itemsMode));
@@ -391,18 +514,19 @@
       msCity([...new Set(info.byBrand.map((r) => r.city))].sort().map((v) => ({ v, l: v })), p.city);
       msOutlet([...info.poolRows].sort((a, b) => a.city.localeCompare(b.city) || a.name.localeCompare(b.name)).map((r) => ({ v: r.restaurant_id, l: r.name, sub: r.city })), p.outlet);
     }
-    $('scope-sub').textContent = `${info.label} · ${PERIOD_LABEL[p.period]}${p.daytype === 'all' ? '' : ' · ' + p.daytype + 's'}`;
-    $('rating-window').textContent = PERIOD_LABEL[p.period];
+    $('scope-sub').textContent = `${info.label} · ${winLabel(p)}${p.daytype === 'all' ? '' : ' · ' + p.daytype + 's'}`;
+    $('rating-window').textContent = winLabel(p);
 
-    const daily = rows('daily'), kp = rows('kpis'), cancAll = rows('cancellations'), hourlyAll = rows('hourly');
-    const end = daily.length ? d3.max(daily, (r) => dayNum(r.day)) : 0;
+    const cancAll = rows('cancellations'), hourlyAll = rows('hourly'), end = p.end;
+    // network and single outlets: precomputed in `kpis` for the presets, computed here for a custom range
+    const kp = !p.custom ? rows('kpis') : daily.length && restaurants.length ? cached('kpc', [daily, restaurants, p.end, p.period, p.daytype], () => customKpis(daily, p)) : [];
     const inSel = (r) => info.ids.has(r.restaurant_id);
     const K = (scope) => kp.find((r) => r.scope === scope && +r.period === p.period && r.daytype === p.daytype) || null;
     const net = K('all');
-    // network and single outlets are precomputed in `kpis`; any other selection is aggregated here
+    // any other selection is aggregated here
     const row = !info.any ? net : info.single ? K(info.single)
-      : daily.length ? cached('row', [daily, restaurants, info.selKey, p.period, p.daytype], () => Object.assign({ scope: 'selection' }, kpiFor(daily.filter(inSel), end, p.period, p.daytype))) : null;
-    const cm = cancAll.length ? cached('cm', [cancAll, restaurants, info.selKey, p.period], () => cancelMix(cancAll.filter(inSel), d3.max(cancAll, (r) => dayNum(r.week)) + 6, p.period)) : [];
+      : daily.length ? cached('row', [daily, restaurants, info.selKey, p.end, p.period, p.daytype], () => Object.assign({ scope: 'selection' }, kpiFor(daily.filter(inSel), end, p.period, p.daytype))) : null;
+    const cm = cancAll.length ? cached('cm', [cancAll, restaurants, info.selKey, p.custom, p.end, p.period], () => cancelMix(cancAll.filter(inSel), inWeeks(p, d3.max(cancAll, (r) => dayNum(r.week)) + 6), p.period)) : [];
     const hc = cached('hc', [hourlyAll, restaurants, info.selKey], () => hourlyCuts(hourlyAll.filter(inSel)));
     const topReason = cm.filter((r) => r.level === 'reason').sort((a, b) => b.pct - a.pct)[0];
     const cmRow = (level, name) => cm.find((r) => r.level === level && r.name === name) || null;
@@ -420,6 +544,7 @@
     drawTakeaway(p, info, row, net, kp);
     // leaderboard
     drawLeaderboard(p, info, kp, net);
+    drawGuide(p, row);
 
     if (!daily.length) return;
     const ids = info.ids, allIds = new Set(restaurants.map((r) => r.restaurant_id));
@@ -446,7 +571,8 @@
     const l1Label = state.l1 ? L1.find((x) => x[0] === state.l1)[1] : null;
     $('l2-sub').textContent = (l1Label ? 'within ' + l1Label : 'all L1') + ' · weekly feed, all days';
     $('items-sub').textContent = l1Label ? 'within ' + l1Label : 'all L1';
-    const comp = rows('complaints').filter((r) => ids.has(r.restaurant_id) && dayNum(r.week) > end - p.period && (!state.l1 || r.l1 === state.l1));
+    const wk = inWeeks(p, end);
+    const comp = rows('complaints').filter((r) => ids.has(r.restaurant_id) && wk(dayNum(r.week)) && (!state.l1 || r.l1 === state.l1));
     if (vis('c-l2')) { const m = d3.rollups(comp, (v) => d3.sum(v, (r) => N(r.orders)), (r) => r.l2).sort((a, b) => b[1] - a[1]).slice(0, 12); C.ranked($('c-l2'), m.map(([l, c]) => ({ label: l, value: orders ? (100 * c) / orders : 0, sub: `${F.int(c)}` })), { fmt: F.pct }); }
     const items = rows('item_issues').filter((r) => ids.has(r.restaurant_id));
     if (vis('c-items')) {
@@ -466,7 +592,7 @@
     if (vis('c-crit-items')) { const m = d3.rollups(items.filter((r) => N(r.critical_orders) > 0), (v) => d3.sum(v, (r) => N(r.critical_orders)), (r) => r.item).sort((a, b) => b[1] - a[1]).slice(0, 8); C.ranked($('c-crit-items'), m.map(([l, c]) => ({ label: l, value: c, color: 'var(--cds-chart-status-critical)' })), { fmt: F.int }); }
 
     // ---- Output: cancellation
-    const canc = rows('cancellations').filter((r) => ids.has(r.restaurant_id) && dayNum(r.week) > end - p.period);
+    const canc = rows('cancellations').filter((r) => ids.has(r.restaurant_id) && wk(dayNum(r.week)));
     const cancTot = d3.sum(canc, (r) => N(r.orders));
     if (vis('c-cancel-reasons')) { const m = d3.rollups(canc, (v) => d3.sum(v, (r) => N(r.orders)), (r) => r.reason).sort((a, b) => b[1] - a[1]); C.ranked($('c-cancel-reasons'), m.map(([l, c]) => ({ label: l, value: cancTot ? (100 * c) / cancTot : 0, sub: F.int(c), color: l === 'Item unavailable' ? dash.colors[3] : dash.colors[0] })), { fmt: F.pct }); }
     const GC = { RDC_RCC: dash.colors[0], RDC_OOS: dash.colors[3], Tech: dash.colors[2], FXM: dash.colors[4], Other: dash.colors[6] };
@@ -516,7 +642,7 @@
     const d = row.rating_d;
     const subject = info.single || !info.any ? `${esc(info.name)} rates` : p.outlet.length ? `${esc(info.name)} rate` : `The ${info.ids.size} outlets in ${esc(info.name)} rate`;
     let html = `${subject} ${mark(p.scope, 'rating', F.rating(row.rating), status('rating', row.rating))}`;
-    html += d == null ? ` over the ${PERIOD_LABEL[p.period]}` : ` (${mark(p.scope, 'rating_d', SIGNED.rating(d), deltaClass('rating', d))} vs the prior ${PERIOD_LABEL[p.period].replace('last ', '')})`;
+    html += d == null ? ` over ${p.custom ? winRange(p) : 'the ' + PERIOD_LABEL[p.period]}` : ` (${mark(p.scope, 'rating_d', SIGNED.rating(d), deltaClass('rating', d))} vs the ${priorLabel(p)})`;
     const DRIVERS = [['kpt', 'KPT', 'min'], ['vis_pct', 'visibility', 'pct'], ['mfr_correct_pct', 'correct MFR', 'pct'], ['handover', 'handover', 'min'], ['food_wait_pct', 'food waiting for a rider', 'pct']];
     const gap = (r, k) => { if (!net || r[k] == null || net[k] == null) return 0; const g = (r[k] - net[k]) / (Math.abs(net[k]) || 1); return GOOD[k] === 'low' ? g : -g; };
     if (!info.single) {
@@ -548,7 +674,7 @@
     const k = state.lbSort, dir = (GOOD[k] === 'low' ? 1 : -1) * (state.lbOrder === 'worst' ? -1 : 1);
     list.sort((a, b) => ((a[k] == null) - (b[k] == null)) || dir * (a[k] - b[k]));
     $('lb').querySelectorAll('[data-sort]').forEach((h) => h.setAttribute('aria-sort', h.dataset.sort === k ? (dir > 0 ? 'ascending' : 'descending') : 'none'));
-    $('lb-note').textContent = `${list.length} outlets${(info.single ? brandCity : info.any) ? ' in the current filter' : ''} · ${PERIOD_LABEL[p.period]}. Open a row to see why: input → output → outcome, each against the network.`;
+    $('lb-note').textContent = `${list.length} outlets${(info.single ? brandCity : info.any) ? ' in the current filter' : ''} · ${winLabel(p)}. Open a row to see why: input → output → outcome, each against the network.`;
     const ext = {}; Object.values(LBT).flat().forEach(([f]) => { const vs = list.map((r) => r[f]).concat(net ? [net[f]] : []).filter((v) => v != null); ext[f] = [d3.min(vs), d3.max(vs)]; });
     const Wh = (scope) => where({ scope, period: p.period, daytype: p.daytype });
     const m = (scope, f, text, cls) => `<span class="${cls || ''}" data-source="kpis" data-field="${f}" data-where="${attr(Wh(scope))}">${text}</span>`;
