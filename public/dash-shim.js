@@ -4,7 +4,7 @@
   const datasets = {};      // id -> {status, data, columns, message}
   const calcs = {};         // id -> {inputs, fn, result}
   const listeners = [];
-  const DEFAULT_PARAMS = { brand: [], city: [], outlet: [], period: 28, daytype: 'all', from: '', to: '' };
+  const DEFAULT_PARAMS = { brand: [], state: [], city: [], outlet: [], period: 28, daytype: 'all', from: '', to: '' };
   let params = { ...DEFAULT_PARAMS };
   let notifyQueued = false;
 

@@ -145,39 +145,55 @@
   /* ---------- state ---------- */
   const state = { l1: null, itemsMode: 'same', lbSort: 'rating', lbOrder: 'worst', open: new Set(), ideal: 18 };
   let restaurants = [], byId = {};
-  const params = () => { const p = dash.params(); return { brand: p.brand || [], city: p.city || [], outlet: p.outlet || [], period: +(p.period || 28), daytype: p.daytype || 'all', from: p.from || '', to: p.to || '' }; };
+  const params = () => { const p = dash.params(); return { brand: p.brand || [], state: p.state || [], city: p.city || [], outlet: p.outlet || [], period: +(p.period || 28), daytype: p.daytype || 'all', from: p.from || '', to: p.to || '' }; };
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
-  /* Brand / city / outlet filters: any picked value within a filter, every filter together; nothing picked = no limit.
-     Brand narrows the city list, brand + city narrow the outlet list ("pool"). One outlet left = outlet view. */
+  /* State of each city in the outlet master (the master has no state column). Delhi and Chandigarh are union territories;
+     Aurangabad is the Maharashtra one. A city missing here shows under "Other" — add it to this list. */
+  const STATE = {
+    'Andhra Pradesh': ['Guntur', 'Vijayawada', 'Vizag'], Bihar: ['Muzaffarpur', 'Patna'], Chandigarh: ['Chandigarh'], Delhi: ['Delhi'],
+    Gujarat: ['Ahmedabad', 'Anand', 'Surat', 'Vadodara'], Haryana: ['Faridabad', 'Gurgaon'], Jharkhand: ['Bokaro', 'Dhanbad', 'Ranchi'],
+    Karnataka: ['Bangalore', 'Belgaum', 'Hubli', 'Manipal', 'Mysore'], Kerala: ['Kochi', 'Kozhikode', 'Thiruvananthapuram', 'Thrissur'],
+    'Madhya Pradesh': ['Bhopal', 'Indore'], Maharashtra: ['Aurangabad', 'Mumbai', 'Nagpur', 'Nashik', 'Pune'], Odisha: ['Bhubaneswar'],
+    Punjab: ['Amritsar', 'Jalandhar', 'Ludhiana'], Rajasthan: ['Jaipur', 'Jodhpur', 'Kota', 'Udaipur'],
+    'Tamil Nadu': ['Chennai', 'Coimbatore', 'Hosur', 'Madurai', 'Trichy'], Telangana: ['Hyderabad'],
+    'Uttar Pradesh': ['Agra', 'Kanpur', 'Lucknow', 'Noida', 'Noida 1'], Uttarakhand: ['Dehradun'], 'West Bengal': ['Kolkata'],
+  };
+  const STATE_OF = Object.fromEntries(Object.entries(STATE).flatMap(([s, cities]) => cities.map((c) => [c, s])));
+
+  /* Brand / state / city / outlet filters: any picked value within a filter, every filter together; nothing picked = no limit.
+     Brand narrows the state list, brand + state the city list, all three the outlet list ("pool"). One outlet left = outlet view. */
   const pick = (vals, v) => !vals.length || vals.includes(v);
   const listLabel = (vals, noun) => (vals.length <= 2 ? vals.join(' + ') : `${vals.length} ${noun}`);
   function scopeInfo(p) {
-    const byBrand = restaurants.filter((r) => pick(p.brand, r.region)), poolRows = byBrand.filter((r) => pick(p.city, r.city));
+    const byBrand = restaurants.filter((r) => pick(p.brand, r.region)), byState = byBrand.filter((r) => pick(p.state, r.state)), poolRows = byState.filter((r) => pick(p.city, r.city));
     const ids = new Set(poolRows.filter((r) => pick(p.outlet, r.restaurant_id)).map((r) => r.restaurant_id));
-    const any = p.brand.length + p.city.length + p.outlet.length > 0, single = ids.size === 1 ? [...ids][0] : null, o = single && byId[single];
-    const parts = [];   // picked outlets already imply their brand and city, so they name the selection alone
+    const any = p.brand.length + p.state.length + p.city.length + p.outlet.length > 0, single = ids.size === 1 ? [...ids][0] : null, o = single && byId[single];
+    const parts = [];   // picked outlets already imply their brand, state and city, so they name the selection alone
     if (p.outlet.length) parts.push(listLabel(p.outlet.map((id) => (byId[id] ? byId[id].name : id)), 'outlets'));
     else {
       if (p.brand.length) parts.push(listLabel(p.brand, 'brands'));
+      if (p.state.length && !p.city.length) parts.push(listLabel(p.state, 'states'));   // picked cities already imply their state
       if (p.city.length) parts.push(listLabel(p.city, 'cities'));
     }
     return {
-      byBrand, poolRows, pool: new Set(poolRows.map((r) => r.restaurant_id)), ids, any, single,
+      byBrand, byState, poolRows, pool: new Set(poolRows.map((r) => r.restaurant_id)), ids, any, single,
       name: !any ? 'Network' : o ? o.name : parts.join(', '),
       label: !any ? 'All outlets' : o ? `${o.name} · ${o.city}` : p.outlet.length ? parts[0] : `${parts.join(' · ')} · ${ids.size} outlets`,
       key: !any ? 'all' : single || 'selection',
-      selKey: JSON.stringify([p.brand, p.city, p.outlet]),
+      selKey: JSON.stringify([p.brand, p.state, p.city, p.outlet]),
     };
   }
   /* set one filter, then drop picks the narrower filters no longer offer */
   function setSel(key, vals) {
     const p = Object.assign(params(), { [key]: vals });
     const byBrand = restaurants.filter((r) => pick(p.brand, r.region));
-    p.city = p.city.filter((c) => byBrand.some((r) => r.city === c));
-    const pool = new Set(byBrand.filter((r) => pick(p.city, r.city)).map((r) => r.restaurant_id));
+    p.state = p.state.filter((s) => byBrand.some((r) => r.state === s));
+    const byState = byBrand.filter((r) => pick(p.state, r.state));
+    p.city = p.city.filter((c) => byState.some((r) => r.city === c));
+    const pool = new Set(byState.filter((r) => pick(p.city, r.city)).map((r) => r.restaurant_id));
     p.outlet = p.outlet.filter((id) => pool.has(id));
-    dash.setParams({ brand: p.brand, city: p.city, outlet: p.outlet });
+    dash.setParams({ brand: p.brand, state: p.state, city: p.city, outlet: p.outlet });
   }
 
   /* ---------- tiles ---------- */
@@ -278,7 +294,7 @@
   Object.entries(AVAIL).forEach(([g, [a, b]]) => { $('avail-' + g).textContent = `${a} of ${b} sub-metrics`; });
 
   /* ---------- controls ---------- */
-  const setDefaults = () => dash.setParams({ brand: [], city: [], outlet: [], period: 28, daytype: 'all', from: '', to: '' });
+  const setDefaults = () => dash.setParams({ brand: [], state: [], city: [], outlet: [], period: 28, daytype: 'all', from: '', to: '' });
 
   /* checkbox drop-down for one filter; returns update(options [{v, l, sub}], selected) */
   const CHEV = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
@@ -311,6 +327,7 @@
     };
   }
   const msBrand = multiSelect('f-brand', 'brand', { title: 'Brand', noun: 'brands' });
+  const msState = multiSelect('f-state', 'state', { title: 'State', noun: 'states', search: true });
   const msCity = multiSelect('f-city', 'city', { title: 'City', noun: 'cities', search: true });
   const msOutlet = multiSelect('f-outlet', 'outlet', { title: 'Outlet', noun: 'outlets', search: true });
   document.addEventListener('click', (e) => { if (!e.target.closest('.ops-ms')) closeMenus(); });
@@ -416,12 +433,14 @@
     ['chain-input', 'chain-output', 'chain-outcome', 'input', 'output', 'outcome'].forEach((id, i) => $(id).style.setProperty('--tier', dash.colors[[2, 1, 0][i % 3]]));
 
     restaurants = rows('restaurants'); byId = Object.fromEntries(restaurants.map((r) => [r.restaurant_id, r]));
+    restaurants.forEach((r) => { if (!r.state) r.state = STATE_OF[r.city] || 'Other'; });
     const info = scopeInfo(p);
     p.scope = info.key;   // 'all' | outlet id | 'selection' — labels the data-where links
     // brand / city / outlet filters
     if (restaurants.length) {
       msBrand([...new Set(restaurants.map((r) => r.region))].sort().map((v) => ({ v, l: v })), p.brand);
-      msCity([...new Set(info.byBrand.map((r) => r.city))].sort().map((v) => ({ v, l: v })), p.city);
+      msState([...new Set(info.byBrand.map((r) => r.state))].sort().map((v) => ({ v, l: v })), p.state);
+      msCity([...new Set(info.byState.map((r) => r.city))].sort().map((v) => ({ v, l: v, sub: p.state.length === 1 ? '' : STATE_OF[v] })), p.city);
       msOutlet([...info.poolRows].sort((a, b) => a.city.localeCompare(b.city) || a.name.localeCompare(b.name)).map((r) => ({ v: r.restaurant_id, l: r.name, sub: r.city })), p.outlet);
     }
     $('scope-sub').textContent = `${info.label} · ${winLabel(p)}${p.daytype === 'all' ? '' : ' · ' + p.daytype + 's'}`;
@@ -578,7 +597,7 @@
   function drawLeaderboard(p, info, kp, net) {
     const box = $('lb-rows');
     // one outlet picked: list its brand / city peers so the row stays in context
-    const ids = info.single ? info.pool : info.ids, brandCity = p.brand.length + p.city.length > 0;
+    const ids = info.single ? info.pool : info.ids, brandCity = p.brand.length + p.state.length + p.city.length > 0;
     let list = kp.filter((r) => ids.has(r.scope) && +r.period === p.period && r.daytype === p.daytype);
     const k = state.lbSort, dir = (GOOD[k] === 'low' ? 1 : -1) * (state.lbOrder === 'worst' ? -1 : 1);
     list.sort((a, b) => ((a[k] == null) - (b[k] == null)) || dir * (a[k] - b[k]));
