@@ -185,7 +185,7 @@
   /* ---------- metric definitions: what each tile shows, how it is calculated and from which table.column ----------
      t = tier, n = name, w = what it means, f = formula, s = source. "Orders" always means every fact_orders row
      (delivered + cancelled); time metrics use delivered orders only. Feeds are dated by order_date, concern_date,
-     rating_date, avail_date and mfr_date. One entry feeds both the ⓘ popover and the Metric guide table. */
+     rating_date, avail_date and mfr_date. Shown in the ⓘ popover on each tile. */
   const ORDERS_W = 'Each outlet-day\'s average is weighted by that day\'s orders, so busy days count more.';
   const MI = {
     kpt: { t: 'Input', n: 'KPT', w: 'Average kitchen prep time: order placed → food marked ready.', f: 'Σ(daily avg KPT × orders) ÷ Σ orders. Daily avg = AVG(kpt_min) of delivered orders. ' + ORDERS_W, s: 'fact_orders.kpt_min' },
@@ -375,12 +375,11 @@
   // custom date range: both ends needed; picking one end keeps the other from the window on screen
   const onDate = () => { let f = $('f-from').value, t = $('f-to').value; if (!f || !t) return; if (f > t) [f, t] = [t, f]; dash.setParams({ from: f, to: t }); };
   $('f-from').addEventListener('change', onDate); $('f-to').addEventListener('change', onDate);
-  // metric popover (ⓘ on a tile) and the guide link
+  // metric popover (ⓘ on a tile)
   const pop = document.createElement('div'); pop.className = 'ops-pop'; pop.hidden = true; pop.setAttribute('role', 'dialog'); document.body.appendChild(pop);
   let popFor = null;
   document.addEventListener('click', (e) => {
     const b = e.target.closest('.ops-i');
-    if (e.target.closest('[data-guide]')) { pop.hidden = true; popFor = null; $('guide').scrollIntoView({ behavior: 'smooth', block: 'start' }); return; }
     if (!b) { if (!e.target.closest('.ops-pop')) { pop.hidden = true; popFor = null; } return; }
     e.stopPropagation();   // capture phase: keeps the chain column's click-to-scroll from firing
     if (popFor === b && !pop.hidden) { pop.hidden = true; popFor = null; return; }
@@ -389,7 +388,6 @@
     pop.style.width = w + 'px'; pop.style.left = Math.max(16, Math.min(r.left + window.scrollX - 12, window.scrollX + window.innerWidth - w - 16)) + 'px'; pop.style.top = r.bottom + window.scrollY + 6 + 'px';
   }, true);
   document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !pop.hidden) { pop.hidden = true; if (popFor) popFor.focus(); popFor = null; } });
-  $('f-guide').addEventListener('click', () => { $('guide').scrollIntoView({ behavior: 'smooth', block: 'start' }); dash.setLink('guide'); });
   seg('lb-order', 'order', (v) => { state.lbOrder = v; redraw(); });
   $('f-reset').addEventListener('click', () => { dash.resetParams(); setDefaults(); state.l1 = null; });
   $('ideal-tat').addEventListener('change', (e) => { const v = +e.target.value; if (v > 0) { state.ideal = v; redraw(); } });
@@ -443,16 +441,7 @@
       ? `<p class="ops-pop-cmp"><b>Comparison</b> This period ${winRange(p)} vs the prior period ${priorRange(p)}: the same ${p.period} days just before, with the same filters and the same formula. Change = this period − prior${/pct$/.test(k) ? ' (in percentage points, pt)' : ''}.</p>`
       : /^(top_reason|oos_)/.test(k) ? '<p class="ops-pop-cmp">Weekly feed: counted over whole weeks, no prior-period comparison.</p>' : '';
     const rule = [TH[k] ? 'Dot: ' + dotRule(k) : '', better(k)].filter(Boolean).join('. ');
-    return `<h4>${esc(m.n)}</h4><p>${esc(m.w)}</p><dl><dt>Formula</dt><dd>${esc(m.f)}</dd><dt>Source</dt><dd><code>${esc(m.s)}</code></dd>${rule ? `<dt>Target</dt><dd>${rule}</dd>` : ''}</dl>${cmp}<button type="button" class="ops-link" data-guide>All metrics ↓</button>`;
-  }
-  const TIERS = ['Input', 'Output', 'Outcome'];
-  $('guide-table').innerHTML = `<table><thead><tr><th>Metric</th><th>What it shows</th><th>Formula</th><th>Source (table.column)</th><th>Target</th></tr></thead><tbody>`
-    + TIERS.map((t) => `<tr class="tier-row"><th colspan="5">${t}</th></tr>` + Object.entries(MI).filter(([, m]) => m.t === t).map(([k, m]) => `<tr><td>${esc(m.n)}</td><td>${esc(m.w)}</td><td>${esc(m.f)}</td><td><code>${esc(m.s)}</code></td><td>${[TH[k] ? dotRule(k) : '', better(k)].filter(Boolean).join('. ') || '—'}</td></tr>`).join('')).join('')
-    + '</tbody></table>';
-  function drawGuide(p, row) {
-    const partial = row && row.prior_cover != null && row.prior_cover < 0.8;
-    $('guide-cmp').innerHTML = !dataEnd ? '' : `<p><b>Right now:</b> this period is <b>${winRange(p)}</b> (${p.period} days)${p.daytype === 'all' ? '' : `, ${p.daytype}s only`}; the prior period is <b>${priorRange(p)}</b>. Data runs ${fmtDay(dataStart, true)} – ${fmtDay(dataEnd, true)}${p.start - p.period < dataStart ? ', so the prior period starts before the data does and only covers part of it' : ''}.`
-      + (partial ? ` <span class="warn">⚠ The prior period has only ${Math.round(100 * row.prior_cover)}% of this period's orders, so its comparisons (marked ⚠ on the tiles) are unreliable.</span>` : '') + '</p>';
+    return `<h4>${esc(m.n)}</h4><p>${esc(m.w)}</p><dl><dt>Formula</dt><dd>${esc(m.f)}</dd><dt>Source</dt><dd><code>${esc(m.s)}</code></dd>${rule ? `<dt>Target</dt><dd>${rule}</dd>` : ''}</dl>${cmp}`;
   }
 
   /* daily aggregate per day for a set of ids, with 7-day rolling for weighted metrics */
@@ -544,7 +533,6 @@
     drawTakeaway(p, info, row, net, kp);
     // leaderboard
     drawLeaderboard(p, info, kp, net);
-    drawGuide(p, row);
 
     if (!daily.length) return;
     const ids = info.ids, allIds = new Set(restaurants.map((r) => r.restaurant_id));

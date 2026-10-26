@@ -29,7 +29,6 @@
       <button type="button" data-v="all">All</button><button type="button" data-v="weekday">Weekday</button><button type="button" data-v="weekend">Weekend</button></span></span>
     <span class="ops-f">Dates <span class="ops-dates" id="f-dates"><input type="date" id="f-from" aria-label="From date"><span>–</span><input type="date" id="f-to" aria-label="To date"></span></span>
     <button type="button" class="ops-reset" id="f-reset">Reset filters</button>
-    <button type="button" class="ops-guide-btn" id="f-guide">ⓘ Metric guide</button>
   </div>
 
   <!-- Causal chain: what drives what, left to right -->
@@ -239,26 +238,6 @@
         <div class="ops-na" id="na-guestvalue"></div>
       </div>
     </div>
-  </section>
-
-  <!-- METRIC GUIDE -->
-  <section class="tier" id="guide">
-    <div class="tier-head"><h2>Metric guide</h2><p>How every number on this page is calculated, and how the comparison with the prior period works.</p></div>
-    <div class="ops-card guide-card">
-      <h3>The prior-period comparison</h3>
-      <ul class="guide-list">
-        <li><b>This period</b> is the window you picked: the last 7 days, 4 weeks or 12 weeks up to the latest day of data, or your own Dates range.</li>
-        <li><b>The prior period</b> is the same number of days immediately before it: for the last 4 weeks, it is the 4 weeks before those. Brand, city, outlet and Days filters apply to both.</li>
-        <li><b>The change</b> under each number = this period − prior period, each worked out with the same formula. Percentages change in percentage points (pt): 2.0% → 2.5% is +0.5 pt.</li>
-        <li><b>Colour of the change:</b> green when the metric moved the good way (e.g. KPT down, rating up), red when it moved the bad way.</li>
-        <li><b>Coloured dot</b> before a number: green / amber / red against fixed targets (see the Target column below), not against the prior period.</li>
-        <li><b>“no prior period”</b> = there is no data before this window (e.g. 12 weeks when the data covers less than 24 weeks).</li>
-        <li><b>⚠</b> = the prior period has under 80% of this period's orders, usually because order data is missing for some of its days. Comparisons of % metrics are then unreliable. Hover the change to see both date ranges.</li>
-        <li>The hour × weekday charts, day-part charts and item lists use the full history (their feeds have no date), and complaint / cancellation breakdowns are counted by whole weeks.</li>
-      </ul>
-      <div id="guide-cmp" class="guide-now"></div>
-    </div>
-    <div class="ops-card guide-card"><h3>Every metric</h3><div class="guide-table" id="guide-table"></div></div>
   </section>
 </div>
 </div>
