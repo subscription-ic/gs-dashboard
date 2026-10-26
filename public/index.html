@@ -16,9 +16,17 @@
       <h1>Restaurant Ops Diagnostics</h1>
       <span class="ops-sub" id="scope-sub">—</span>
     </div>
-    <p class="ops-takeaway" id="takeaway">—</p>
   </header>
 
+  <!-- Tabs and filters stay on screen while scrolling; the filters apply to every tab -->
+  <div class="ops-sticky">
+  <nav class="ops-tabs" id="tabs" role="tablist" aria-label="Dashboard sections">
+    <button type="button" role="tab" data-tab="overview">Overview</button>
+    <button type="button" role="tab" data-tab="leaderboard">Leaderboard <span class="ops-tab-n" id="tab-n-lb"></span></button>
+    <button type="button" role="tab" data-tab="input"><i class="ops-tab-dot" data-tier="input"></i>Input</button>
+    <button type="button" role="tab" data-tab="output"><i class="ops-tab-dot" data-tier="output"></i>Output</button>
+    <button type="button" role="tab" data-tab="outcome"><i class="ops-tab-dot" data-tier="outcome"></i>Outcome</button>
+  </nav>
   <div class="ops-filters" id="filters">
     <div class="ops-f">Brand <div class="ops-ms" id="f-brand" data-source="restaurants"></div></div>
     <div class="ops-f">State <div class="ops-ms" id="f-state" data-source="restaurants"></div></div>
@@ -31,9 +39,12 @@
     <span class="ops-f">Dates <span class="ops-dates" id="f-dates"><input type="date" id="f-from" aria-label="From date"><span>–</span><input type="date" id="f-to" aria-label="To date"></span></span>
     <button type="button" class="ops-reset" id="f-reset">Reset filters</button>
   </div>
+  </div>
 
-  <!-- Causal chain: what drives what, left to right -->
-  <section class="ops-chain" id="chain" aria-label="Causal chain">
+  <!-- OVERVIEW: summary sentence + causal chain (what drives what, left to right); a column opens its tab -->
+  <section class="ops-panel" id="overview" data-tab="overview" role="tabpanel">
+  <p class="ops-takeaway" id="takeaway">—</p>
+  <div class="ops-chain" id="chain" aria-label="Causal chain">
     <div class="ops-chain-col" id="chain-input" data-go="input">
       <h2>Input <small>what the kitchen controls</small></h2>
       <div class="ops-kpis" id="chain-input-kpis"></div>
@@ -48,10 +59,12 @@
       <h2>Outcome <small>what the customer and P&amp;L see</small></h2>
       <div class="ops-kpis" id="chain-outcome-kpis"></div>
     </div>
+  </div>
+  <p class="ops-note ops-hint">Click a column for its detail, or open the Leaderboard tab to compare outlets.</p>
   </section>
 
-  <!-- Leaderboard -->
-  <section class="ops-card ops-board" id="leaderboard">
+  <!-- LEADERBOARD -->
+  <section class="ops-card ops-board" id="leaderboard" data-tab="leaderboard" role="tabpanel">
     <div class="ops-board-head">
       <h2>Outlet leaderboard</h2>
       <span class="ops-note" id="lb-note">Ranked by rating. Open a row to see why: input → output → outcome, each against the network.</span>
@@ -71,7 +84,7 @@
   </section>
 
   <!-- INPUT -->
-  <section class="tier" id="input">
+  <section class="tier" id="input" data-tab="input" role="tabpanel">
     <div class="tier-head"><h2>Input</h2><p>What the kitchen controls: prep time, being online, marking food ready, handover, stock.</p></div>
 
     <div class="grp" id="grp-kpt" data-open="1">
@@ -131,7 +144,7 @@
   </section>
 
   <!-- OUTPUT -->
-  <section class="tier" id="output">
+  <section class="tier" id="output" data-tab="output" role="tabpanel">
     <div class="tier-head"><h2>Output</h2><p>What went wrong on orders: complaints, critical incidents, cancellations, refunds and time to deliver.</p></div>
 
     <div class="grp" id="grp-concerns" data-open="1">
@@ -204,7 +217,7 @@
   </section>
 
   <!-- OUTCOME -->
-  <section class="tier" id="outcome">
+  <section class="tier" id="outcome" data-tab="outcome" role="tabpanel">
     <div class="tier-head"><h2>Outcome</h2><p>Rating, lost sales and value given back — the result of everything above.</p></div>
 
     <div class="grp" id="grp-rating" data-open="1">

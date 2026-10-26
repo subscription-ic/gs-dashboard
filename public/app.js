@@ -143,7 +143,8 @@
   const cached = (key, deps, fn) => { const m = memo.get(key); if (m && m.deps.every((d, i) => d === deps[i])) return m.val; const val = fn(); memo.set(key, { deps, val }); return val; };
 
   /* ---------- state ---------- */
-  const state = { l1: null, itemsMode: 'same', lbSort: 'rating', lbOrder: 'worst', open: new Set(), ideal: 18 };
+  const TABS = ['overview', 'leaderboard', 'input', 'output', 'outcome'];
+  const state = { l1: null, itemsMode: 'same', lbSort: 'rating', lbOrder: 'worst', open: new Set(), ideal: 18, lbLimit: 50, tab: TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview' };
   let restaurants = [], byId = {};
   const params = () => { const p = dash.params(); return { brand: p.brand || [], state: p.state || [], city: p.city || [], outlet: p.outlet || [], period: +(p.period || 28), daytype: p.daytype || 'all', from: p.from || '', to: p.to || '' }; };
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -336,14 +337,24 @@
   // custom date range: both ends needed; picking one end keeps the other from the window on screen
   const onDate = () => { let f = $('f-from').value, t = $('f-to').value; if (!f || !t) return; if (f > t) [f, t] = [t, f]; dash.setParams({ from: f, to: t }); };
   $('f-from').addEventListener('change', onDate); $('f-to').addEventListener('change', onDate);
-  seg('lb-order', 'order', (v) => { state.lbOrder = v; redraw(); });
+  seg('lb-order', 'order', (v) => { state.lbOrder = v; state.lbLimit = 50; redraw(); });
   $('f-reset').addEventListener('click', () => { dash.resetParams(); setDefaults(); state.l1 = null; });
   $('ideal-tat').addEventListener('change', (e) => { const v = +e.target.value; if (v > 0) { state.ideal = v; redraw(); } });
   document.querySelectorAll('[data-items]').forEach((c) => c.addEventListener('click', () => { state.itemsMode = c.dataset.items; redraw(); }));
   document.querySelectorAll('.grp-head').forEach((b) => b.addEventListener('click', () => { const g = b.closest('.grp'); const open = g.dataset.open !== '1'; g.dataset.open = open ? '1' : '0'; b.setAttribute('aria-expanded', open); if (open) redraw(); }));
-  document.querySelectorAll('.ops-chain-col').forEach((c) => c.addEventListener('click', () => { const el = $(c.dataset.go); el.scrollIntoView({ behavior: 'smooth', block: 'start' }); dash.setLink(el.id); }));
+  /* tabs: one panel on screen at a time; the URL hash keeps the tab across reloads. Charts in hidden panels are skipped
+     by vis() in draw(), so switching redraws the panel that just appeared. */
+  function setTab(t) {
+    state.tab = t; state.lbLimit = 50; dash.setLink(t);
+    const below = $('top').getBoundingClientRect().bottom + window.scrollY;   // a new tab starts at its top
+    if (window.scrollY > below) window.scrollTo({ top: below });
+    redraw();
+  }
+  $('tabs').addEventListener('click', (e) => { const b = e.target.closest('[data-tab]'); if (b) setTab(b.dataset.tab); });
+  document.querySelectorAll('.ops-chain-col').forEach((c) => c.addEventListener('click', () => setTab(c.dataset.go)));
   $('lb').addEventListener('click', (e) => {
-    const h = e.target.closest('[data-sort]'); if (h) { state.lbSort = h.dataset.sort; redraw(); return; }
+    const h = e.target.closest('[data-sort]'); if (h) { state.lbSort = h.dataset.sort; state.lbLimit = 50; redraw(); return; }
+    if (e.target.closest('[data-more]')) { state.lbLimit += 50; redraw(); return; }
     const focus = e.target.closest('[data-focus]'); if (focus) { dash.setParams({ outlet: [focus.dataset.focus] }); return; }
     const clear = e.target.closest('[data-clearfocus]'); if (clear) { dash.setParams({ outlet: [] }); return; }
     const row = e.target.closest('.lb-row'); if (!row) return;
@@ -431,6 +442,9 @@
     document.querySelectorAll('[data-items]').forEach((c) => c.setAttribute('aria-pressed', c.dataset.items === state.itemsMode));
     $('ideal-tat').value = state.ideal;
     ['chain-input', 'chain-output', 'chain-outcome', 'input', 'output', 'outcome'].forEach((id, i) => $(id).style.setProperty('--tier', dash.colors[[2, 1, 0][i % 3]]));
+    document.querySelectorAll('.ops-tab-dot').forEach((d) => d.style.background = dash.colors[{ input: 2, output: 1, outcome: 0 }[d.dataset.tier]]);
+    $('tabs').querySelectorAll('[data-tab]').forEach((b) => b.setAttribute('aria-selected', String(b.dataset.tab === state.tab)));
+    document.querySelectorAll('[role=tabpanel][data-tab]').forEach((s) => { s.hidden = s.dataset.tab !== state.tab; });
 
     restaurants = rows('restaurants'); byId = Object.fromEntries(restaurants.map((r) => [r.restaurant_id, r]));
     restaurants.forEach((r) => { if (!r.state) r.state = STATE_OF[r.city] || 'Other'; });
@@ -472,7 +486,8 @@
     // takeaway
     drawTakeaway(p, info, row, net, kp);
     // leaderboard
-    drawLeaderboard(p, info, kp, net);
+    $('tab-n-lb').textContent = restaurants.length ? (info.single ? info.pool : info.ids).size : '';
+    if (state.tab === 'leaderboard') drawLeaderboard(p, info, kp, net);   // hundreds of rows: only built when on screen
 
     if (!daily.length) return;
     const ids = info.ids, allIds = new Set(restaurants.map((r) => r.restaurant_id));
@@ -606,12 +621,16 @@
     const ext = {}; Object.values(LBT).flat().forEach(([f]) => { const vs = list.map((r) => r[f]).concat(net ? [net[f]] : []).filter((v) => v != null); ext[f] = [d3.min(vs), d3.max(vs)]; });
     const Wh = (scope) => where({ scope, period: p.period, daytype: p.daytype });
     const m = (scope, f, text, cls) => `<span class="${cls || ''}" data-source="kpis" data-field="${f}" data-where="${attr(Wh(scope))}">${text}</span>`;
-    box.innerHTML = list.map((r, i) => {
+    // long lists come in pages of 50; a focused outlet further down is added after a gap, with its real rank
+    const LB_STEP = 50, limit = Math.min(state.lbLimit, list.length), more = list.length - limit;
+    const fi = info.single ? list.findIndex((r) => r.scope === info.single) : -1;
+    const shown = list.slice(0, limit).map((r, i) => [r, i]).concat(fi >= limit ? [[list[fi], fi]] : []);
+    box.innerHTML = shown.map(([r, i]) => {
       const rr = byId[r.scope] || { name: r.scope, city: '' };
       const open = state.open.has(r.scope);
       const flags = FLAGS.map(([f, l]) => [l, status(f, r[f])]).filter(([, s]) => s === 'bad' || s === 'warn').sort((a) => (a[1] === 'bad' ? -1 : 1)).slice(0, 3);
       const stars = r.rating == null ? '' : '★'.repeat(Math.round(r.rating)) + '☆'.repeat(5 - Math.round(r.rating));
-      let html = `<div class="lb-row${info.single === r.scope ? ' focus' : ''}" data-id="${r.scope}" role="button" aria-expanded="${open}">
+      let html = (i === fi && fi >= limit ? '<div class="lb-gap">⋯</div>' : '') + `<div class="lb-row${info.single === r.scope ? ' focus' : ''}" data-id="${r.scope}" role="button" aria-expanded="${open}">
         <span class="lb-rank">${i + 1}</span>
         <span class="lb-name">${rr.name}<small>${rr.city}</small></span>
         <span class="lb-rating"><span class="lb-stars">${stars}</span>${m(r.scope, 'rating', F.rating(r.rating), 'v')}<span class="lb-d">${m(r.scope, 'rating_d', r.rating_d == null ? '' : SIGNED.rating(r.rating_d), deltaClass('rating', r.rating_d))}</span></span>
@@ -626,7 +645,7 @@
           <div class="lb-actions">${info.single === r.scope ? `${p.outlet.length ? `<button type="button" data-clearfocus="1">Back to ${brandCity ? 'all outlets in the filter' : 'network view'}</button>` : ''}<span>Every chart on the page is showing this outlet.</span>` : `<button type="button" data-focus="${r.scope}">Focus every chart on ${rr.name}</button><span>Dot = outlet, grey dot = network; red when worse.</span>`}</div></div>`;
       }
       return html;
-    }).join('');
+    }).join('') + (more > 0 ? `<div class="lb-more"><button type="button" data-more="1">Show ${Math.min(LB_STEP, more)} more</button><span>${limit} of ${list.length} outlets shown</span></div>` : '');
     // dumbbells
     box.querySelectorAll('.lb-diag').forEach((d) => { const r = list.find((x) => x.scope === d.dataset.id); d.querySelectorAll('.db').forEach((db) => { const f = db.dataset.f; const [lo, hi] = ext[f]; C.dumbbell(db, r[f], net ? net[f] : null, lo, hi, GOOD[f] || 'low'); }); });
   }

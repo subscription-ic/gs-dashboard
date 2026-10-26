@@ -1,6 +1,7 @@
-/* Theme tokens that the dashboard shell normally provides. Light + dark. Edit colours here, nowhere else. */
+/* Theme tokens that the dashboard shell normally provides. Light theme only (also when the OS is in dark mode).
+   Edit colours here, nowhere else. */
 :root {
-  color-scheme: light dark;
+  color-scheme: light;
   --font-anthropic-sans: "Inter", "Segoe UI", system-ui, -apple-system, Roboto, Helvetica, Arial, sans-serif;
   --font-anthropic-serif: "Source Serif 4", "Georgia", "Times New Roman", serif;
   /* numbers: a sans with even-height, fixed-width digits (Georgia's old-style digits jump up and down) */
@@ -18,19 +19,21 @@
   --cds-dur-slow: 240ms;
   --cds-ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
 
-  --color-fg: #1f1d1a;
-  --color-fg-muted: #6f6a63;
-  --color-bg: #f6f4ef;
-  --color-panel: #ffffff;
-  --color-border-line: #e4dfd6;
+  --color-page: #ffffff;      /* page background */
+  --color-fg: #1d2129;
+  --color-fg-muted: #5f6672;
+  --color-bg: #f4f5f7;        /* light fills: inputs, inner cards, hover */
+  --color-panel: #ffffff;     /* cards */
+  --color-border-line: #e2e5ea;
   --color-ok: #1f7a4d;
   --color-warn: #b7791f;
   --color-bad: #c0392b;
+  --color-shadow: 0 1px 2px rgba(16, 24, 40, 0.05);
 
-  --cds-text-secondary: #6f6a63;
-  --cds-border: #e4dfd6;
+  --cds-text-secondary: #5f6672;
+  --cds-border: #e2e5ea;
   --cds-surface-popover: #ffffff;
-  --cds-shadow-popover: 0 6px 24px rgba(20, 18, 15, 0.14);
+  --cds-shadow-popover: 0 8px 24px rgba(16, 24, 40, 0.12);
 
   --cds-chart-1: #c96a3b;   /* accent */
   --cds-chart-2: #3f6fb5;
@@ -40,34 +43,14 @@
   --cds-chart-6: #d9a02b;
   --cds-chart-7: #4e8f9c;
   --cds-chart-8: #7d7d7d;
-  --cds-chart-muted: #c9c3b8;
-  --cds-chart-grid: #eeeae2;
-  --cds-chart-axis: #b8b1a5;
-  --cds-chart-reference: #9a9389;
+  --cds-chart-muted: #c3c8d0;
+  --cds-chart-grid: #eceef2;
+  --cds-chart-axis: #b4bac4;
+  --cds-chart-reference: #8f96a3;
   --cds-chart-status-critical: #c0392b;
 }
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-fg: #ece8e1;
-    --color-fg-muted: #a39d93;
-    --color-bg: #15140f;
-    --color-panel: #1e1c17;
-    --color-border-line: #2f2c25;
-    --color-ok: #4fbf84;
-    --color-warn: #e0a84a;
-    --color-bad: #ef6a5a;
-    --cds-text-secondary: #a39d93;
-    --cds-border: #2f2c25;
-    --cds-surface-popover: #26231d;
-    --cds-shadow-popover: 0 6px 24px rgba(0, 0, 0, 0.5);
-    --cds-chart-1: #e08a5a; --cds-chart-2: #6b94d6; --cds-chart-3: #55b58f; --cds-chart-4: #e5636f;
-    --cds-chart-5: #ad85dd; --cds-chart-6: #e7b650; --cds-chart-7: #6fb3c0; --cds-chart-8: #9a9a9a;
-    --cds-chart-muted: #4a463e; --cds-chart-grid: #2a2721; --cds-chart-axis: #55504a; --cds-chart-reference: #6f6961;
-    --cds-chart-status-critical: #ef6a5a;
-  }
-}
 
-html, body { margin: 0; background: var(--color-bg); color: var(--color-fg); }
+html, body { margin: 0; background: var(--color-page); color: var(--color-fg); }
 #dash-root { padding: 20px clamp(16px, 3vw, 40px) 60px; }
 
 /* loading skeleton the shell normally draws */
