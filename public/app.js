@@ -503,8 +503,6 @@
     // critical badges
     $('t-critical').querySelectorAll('[data-source]').forEach((el) => { el.dataset.where = where({ scope: p.scope, period: p.period, daytype: p.daytype }); const f = el.dataset.field; const v = row ? row[f] : null; el.textContent = v == null ? '—' : f.endsWith('_pct') ? v.toFixed(2) + '%' : f.endsWith('_d') ? SIGNED.int(v) : F.int(v); if (el.classList.contains('ops-badge')) el.classList.toggle('hot', v > 0); });
 
-    // takeaway
-    drawTakeaway(p, info, row, net, kp);
     // leaderboard
     $('tab-n-lb').textContent = restaurants.length ? (info.single ? info.pool : info.ids).size : '';
     if (state.tab === 'leaderboard') drawLeaderboard(p, info, kp, net);   // hundreds of rows: only built when on screen
@@ -595,31 +593,6 @@
 
   }
 
-  /* ---------- takeaway ---------- */
-  function drawTakeaway(p, info, row, net, kp) {
-    const el = $('takeaway');
-    if (!row) { el.textContent = '—'; return; }
-    const W = (scope) => where({ scope, period: p.period, daytype: p.daytype });
-    const mark = (scope, field, text, cls) => `<b class="${cls || ''}" data-source="kpis" data-field="${field}" data-where="${attr(W(scope))}">${text}</b>`;
-    const d = row.rating_d;
-    const subject = info.single || !info.any ? `${esc(info.name)} rates` : p.outlet.length ? `${esc(info.name)} rate` : `The ${info.ids.size} outlets in ${esc(info.name)} rate`;
-    let html = `${subject} ${mark(p.scope, 'rating', F.rating(row.rating), status('rating', row.rating))}`;
-    html += d == null ? ` over ${p.custom ? winRange(p) : 'the ' + PERIOD_LABEL[p.period]}` : ` (${mark(p.scope, 'rating_d', SIGNED.rating(d), deltaClass('rating', d))} vs the ${priorLabel(p)})`;
-    const DRIVERS = [['kpt', 'KPT', 'min'], ['vis_pct', 'visibility', 'pct'], ['mfr_correct_pct', 'correct MFR', 'pct'], ['handover', 'handover', 'min'], ['food_wait_pct', 'food waiting for a rider', 'pct']];
-    const gap = (r, k) => { if (!net || r[k] == null || net[k] == null) return 0; const g = (r[k] - net[k]) / (Math.abs(net[k]) || 1); return GOOD[k] === 'low' ? g : -g; };
-    if (!info.single) {
-      const outlets = kp.filter((r) => info.ids.has(r.scope) && +r.period === p.period && r.daytype === p.daytype && r.rating != null).sort((a, b) => a.rating - b.rating).slice(0, 2);
-      if (outlets.length) {
-        html += '. Weakest: ' + outlets.map((o) => { const dr = DRIVERS.map((x) => [x, gap(o, x[0])]).sort((a, b) => b[1] - a[1])[0][0]; return `${byId[o.scope] ? byId[o.scope].name : o.scope} ${mark(o.scope, 'rating', F.rating(o.rating), 'bad')} with ${dr[1]} at ${mark(o.scope, dr[0], F[dr[2]](o[dr[0]]))}`; }).join(' and ');
-        const drs = outlets.map((o) => DRIVERS.map((x) => [x, gap(o, x[0])]).sort((a, b) => b[1] - a[1])[0][0]);
-        html += ` against a network ${drs[0][1]} of ${mark('all', drs[0][0], F[drs[0][2]](net[drs[0][0]]))}.`;
-      } else html += '.';
-    } else {
-      const drs = DRIVERS.map((x) => [x, gap(row, x[0])]).sort((a, b) => b[1] - a[1]).slice(0, 2);
-      html += `. Biggest gaps to the network: ${drs.map(([x]) => `${x[1]} ${mark(p.scope, x[0], F[x[2]](row[x[0]]), status(x[0], row[x[0]]))} vs ${mark('all', x[0], F[x[2]](net[x[0]]))}`).join(', ')}; product concerns run ${mark(p.scope, 'product_pct', F.pct(row.product_pct), status('product_pct', row.product_pct))} against ${mark('all', 'product_pct', F.pct(net.product_pct))}.`;
-    }
-    el.innerHTML = html;
-  }
 
   /* ---------- leaderboard ---------- */
   const LBT = {
