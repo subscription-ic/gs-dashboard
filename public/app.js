@@ -600,6 +600,8 @@
     output: [['product_pct', 'Product concern', 'pct'], ['service_pct', 'Service concern', 'pct'], ['crit_total', 'Critical incidents', 'int'], ['cancel_pct', 'Cancelled', 'pct'], ['tat', 'TAT', 'min']],
     input: [['kpt', 'KPT', 'min'], ['kpt_gt10_pct', 'Orders > 10 min', 'pct'], ['vis_pct', 'Visibility', 'pct'], ['mfr_correct_pct', 'Correct MFR', 'pct'], ['handover', 'Handover', 'min'], ['food_wait_pct', 'Food waited after MFR', 'pct']],
   };
+  // counts and ₹ are network totals, not a typical outlet, so these rows show the outlet's value without a network comparison
+  const NO_NET = new Set(['rating_n', 'sale_loss', 'refund', 'crit_total']);
   const FLAGS = [['kpt', 'KPT'], ['vis_pct', 'Visibility'], ['mfr_correct_pct', 'MFR'], ['handover', 'Handover'], ['product_pct', 'Product'], ['service_pct', 'Service'], ['cancel_pct', 'Cancels'], ['crit_total', 'Critical']];
   function drawLeaderboard(p, info, kp, net) {
     const box = $('lb-rows');
@@ -632,7 +634,7 @@
         <span class="lb-drivers hide-sm">${flags.map(([l, s]) => `<span class="${s}">${l}</span>`).join('') || '<span>no flags</span>'}</span>
         <svg class="lb-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></div>`;
       if (open) {
-        const tier = (key, title, sub, color) => `<div class="lb-tier" style="--tier:${color}"><h4>${title}<small>${sub}</small></h4>` + LBT[key].map(([f, l, fmt]) => `<div class="lb-m"><span class="n">${l}</span>${m(r.scope, f, F[fmt](r[f]), 'v ' + status(f, r[f]))}<span class="net">${net ? m('all', f, F[fmt](net[f])) : '—'} net</span><div class="db" data-f="${f}"></div></div>`).join('') + '</div>';
+        const tier = (key, title, sub, color) => `<div class="lb-tier" style="--tier:${color}"><h4>${title}<small>${sub}</small></h4>` + LBT[key].map(([f, l, fmt]) => `<div class="lb-m"><span class="n">${l}</span>${m(r.scope, f, F[fmt](r[f]), 'v ' + status(f, r[f]))}` + (NO_NET.has(f) ? '<span class="net"></span></div>' : `<span class="net">${net ? m('all', f, F[fmt](net[f])) : '—'} net</span><div class="db" data-f="${f}"></div></div>`)).join('') + '</div>';
         html += `<div class="lb-diag open" data-id="${r.scope}">${tier('input', 'Input', 'operational causes', dash.colors[2])}${tier('output', 'Output', '→ what went wrong', dash.colors[1])}${tier('outcome', 'Outcome', '→ what the customer sees', dash.colors[0])}
           <div class="lb-actions">${info.single === r.scope ? `${p.outlet.length ? `<button type="button" data-clearfocus="1">Back to ${brandCity ? 'all outlets in the filter' : 'network view'}</button>` : ''}<span>Every chart on the page is showing this outlet.</span>` : `<button type="button" data-focus="${r.scope}">Focus every chart on ${rr.name}</button><span>Dot = outlet, grey dot = network; red when worse.</span>`}</div></div>`;
       }
