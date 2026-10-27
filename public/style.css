@@ -291,3 +291,15 @@
   .lb-head, .lb-row { grid-template-columns: 2rem minmax(13rem, 2.1fr) minmax(7rem, 1fr) minmax(4rem, .6fr) minmax(6.5rem, .9fr) minmax(6rem, .8fr) minmax(8rem, 1.2fr) 1.5rem; }
 }
 .ops-kpi[title]:not([title=""]) { cursor: help; }   /* tiles with a hover explanation */
+/* leaderboard breakdown, Outcome panel: stat cards for totals and a rating trend */
+.lb-m .n .lb-stars { margin-left: 4px; }
+.lb-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
+.lb-stat { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 8px; min-width: 0; }
+.lb-stat .n { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-stat .v { font-family: var(--font-figures); font-variant-numeric: lining-nums tabular-nums; font-weight: 700; font-size: 1rem; }
+.lb-stat .dv { align-self: flex-start; font-size: var(--cds-font-size-caption); font-weight: 700; padding: 0 6px; border-radius: 999px; background: var(--color-bg); color: var(--color-fg-muted); }
+.lb-stat .dv.good { background: var(--color-ok-soft); color: var(--color-ok); }
+.lb-stat .dv.poor { background: var(--color-bad-soft); color: var(--color-bad); }
+.lb-spark-h { margin-top: 8px; font-size: var(--cds-font-size-caption); font-weight: 600; color: #374151; }
+.lb-spark-h span { font-weight: 400; color: var(--color-fg-muted); margin-left: 4px; }
+.lb-spark { height: 120px; }
