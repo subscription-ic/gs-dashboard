@@ -563,7 +563,6 @@
     // ---- Input: KPT
     const parts = (f) => [['breakfast', 'Breakfast'], ['lunch', 'Lunch'], ['snacks', 'Snacks'], ['dinner', 'Dinner'], ['late', 'Late night'], ['peak', 'Peak hrs'], ['offpeak', 'Off-peak']].map(([k, l]) => { const r = hc.find((x) => x.daytype === p.daytype && x.part === k); return { label: l, v: r ? r[f] : null, n: r ? r.orders : 0, key: k }; });
     if (vis('c-kpt-parts')) C.parts($('c-kpt-parts'), parts('kpt').filter((x) => x.key !== 'breakfast'), { fmt: F.num1, color: (x) => (x.key === 'peak' ? dash.colors[3] : x.key === 'offpeak' ? dash.colors[2] : dash.colors[0]) });
-    if (vis('c-kpt-line')) C.line($('c-kpt-line'), pair('kpt_avg', 'w'), { fmt: F.min, ref: { v: 8, label: 'target 8 min' } });
     if (vis('c-kpt-peak')) C.line($('c-kpt-peak'), [{ name: 'Peak', color: dash.colors[3], points: S.map((x) => ({ d: x.d, v: x.w('kpt_peak') })) }, { name: 'Off-peak', color: dash.colors[2], points: S.map((x) => ({ d: x.d, v: x.w('kpt_offpeak') })) }], { fmt: F.min });
     const BK = [{ key: 'b0', label: '< 5', color: dash.colors[2] }, { key: 'b1', label: '5–8', color: dash.colors[0] }, { key: 'b2', label: '8–10', color: dash.colors[1] }, { key: 'b3', label: '> 10', color: dash.colors[3] }];
     if (vis('c-kpt-bucket') && row) { const g = [{ label: name, parts: [{ key: 'b0', value: row.kpt_lt5_pct || 0 }, { key: 'b1', value: row.kpt_5_8_pct || 0 }, { key: 'b2', value: row.kpt_8_10_pct || 0 }, { key: 'b3', value: row.kpt_gt10_pct || 0 }] }]; if (!isNet && net) g.push({ label: 'Network', parts: [{ key: 'b0', value: net.kpt_lt5_pct || 0 }, { key: 'b1', value: net.kpt_5_8_pct || 0 }, { key: 'b2', value: net.kpt_8_10_pct || 0 }, { key: 'b3', value: net.kpt_gt10_pct || 0 }] }); C.stackedH($('c-kpt-bucket'), g, BK); }
@@ -573,7 +572,6 @@
     // hours per outlet that was due to open that day (not per outlet in the selection, which dilutes it)
     const perOutlet = (x, k) => (x.day.s.planned ? (x.day.s[k] || 0) / x.day.s.planned : null);
     if (vis('c-vis-line')) C.line($('c-vis-line'), [{ name: 'Online', color: dash.colors[2], points: S.map((x) => ({ d: x.d, v: perOutlet(x, 'online_hours') })) }, { name: 'Planned', muted: true, dashed: true, points: S.map((x) => ({ d: x.d, v: perOutlet(x, 'budget_hours') })) }], { fmt: F.hours, y0: true, shade: weekendDays });
-    if (vis('c-vis-cal')) C.calendar($('c-vis-cal'), S.map((x) => ({ d: x.d, hours: perOutlet(x, 'online_hours') || 0, budget: perOutlet(x, 'budget_hours') || 0, v: x.day.s.budget_hours ? (x.day.s.online_hours || 0) / x.day.s.budget_hours : 0 })));
     if (vis('c-vis-weekly')) C.bars($('c-vis-weekly'), W.map((w) => ({ d: w.d, v: w.s.online_hours ? Math.round(((w.s.budget_hours - w.s.online_hours) * w.s.orders) / w.s.online_hours) : 0 })), { fmt: F.int, color: () => dash.colors[2] });
 
     // ---- Input: MFR
