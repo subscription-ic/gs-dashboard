@@ -295,3 +295,4 @@
 @media (min-width: 761px) {
   .lb-head, .lb-row { grid-template-columns: 2rem minmax(13rem, 2.1fr) minmax(7rem, 1fr) minmax(4rem, .6fr) minmax(6.5rem, .9fr) minmax(6rem, .8fr) minmax(8rem, 1.2fr) 1.5rem; }
 }
+.ops-kpi[title]:not([title=""]) { cursor: help; }   /* tiles with a hover explanation */
