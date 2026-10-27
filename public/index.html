@@ -93,7 +93,6 @@
         <div class="ops-grid">
           <div class="ops-card"><h3>Delivery KPT <span class="n">minutes</span></h3><div class="ops-tiles" id="t-kpt"></div></div>
           <div class="ops-card"><h3>KPT by day part <span class="n">full period · orders-weighted</span></h3><div class="ops-chart short" id="c-kpt-parts" data-source="hourly"></div></div>
-          <div class="ops-card wide"><h3>KPT by hour and weekday <span class="n">full period · darker = slower</span></h3><div class="ops-chart" id="c-kpt-heat" data-source="hourly"></div></div>
           <div class="ops-card"><h3>Daily KPT vs network <span class="n">7-day rolling</span></h3><div class="ops-chart" id="c-kpt-line" data-source="daily"></div></div>
           <div class="ops-card"><h3>Peak vs off-peak KPT <span class="n">7-day rolling</span></h3><div class="ops-chart" id="c-kpt-peak" data-source="daily"></div></div>
           <div class="ops-card"><h3>KPT bucket · orders % <span class="n">&lt;5 · 5–8 · 8–10 · &gt;10 min</span></h3><div class="ops-chart auto" id="c-kpt-bucket" data-source="kpis"></div><p class="ops-note">Bucket edges 5 / 8 / 10 min from the sheet example — to be confirmed (feed has 5-min buckets).</p></div>
@@ -104,12 +103,12 @@
     </div>
 
     <div class="grp" id="grp-vis" data-open="0">
-      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">Visibility<small>Online hours vs budget</small></span><span class="grp-sum" id="sum-vis"></span><span class="grp-avail" id="avail-vis"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">Visibility<small>Online vs planned hours</small></span><span class="grp-sum" id="sum-vis"></span><span class="grp-avail" id="avail-vis"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
       <div class="grp-body">
         <div class="ops-grid">
-          <div class="ops-card"><h3>Visibility</h3><div class="ops-tiles" id="t-vis"></div><p class="ops-note">Lost orders ≈ offline hours × average orders per online hour in the window (feed is daily, so this is an estimate, not the hour that was missed).</p></div>
-          <div class="ops-card"><h3>Online hours per day <span class="n">weekends shaded</span></h3><div class="ops-chart" id="c-vis-line" data-source="daily"></div></div>
-          <div class="ops-card"><h3>Calendar <span class="n">red = non-operational day</span></h3><div class="ops-chart auto" id="c-vis-cal" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Visibility</h3><div class="ops-tiles" id="t-vis"></div><p class="ops-note">Non-op day = a day the outlet was planned to open but was online 0 hours, averaged per outlet. Lost orders ≈ offline hours × orders per online hour; lost value uses the average cancelled-order value as a stand-in for order value (the network's when there are under 20 cancellations). Both are estimates (the feed is daily).</p></div>
+          <div class="ops-card"><h3>Online vs planned hours <span class="n">per open outlet · weekends shaded</span></h3><div class="ops-chart" id="c-vis-line" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Calendar <span class="n">green ≥ 90% of planned hours · red = offline</span></h3><div class="ops-chart auto" id="c-vis-cal" data-source="daily"></div></div>
           <div class="ops-card"><h3>Estimated lost orders per week</h3><div class="ops-chart" id="c-vis-weekly" data-source="daily"></div></div>
         </div>
         <div class="ops-na" id="na-vis"></div>

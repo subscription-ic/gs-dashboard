@@ -13,7 +13,7 @@
     int: (v) => (v == null ? '—' : d3.format(',')(Math.round(v))),
     rating: (v) => (v == null ? '—' : v.toFixed(2)),
     hours: (v) => (v == null ? '—' : v.toFixed(1) + ' h'),
-    days: (v) => (v == null ? '—' : d3.format(',')(v) + (v === 1 ? ' day' : ' days')),
+    days: (v) => (v == null ? '—' : (Number.isInteger(v) ? d3.format(',')(v) : v.toFixed(1)) + (v === 1 ? ' day' : ' days')),
     num1: (v) => (v == null ? '—' : v.toFixed(1)),
   };
   const PERIOD_LABEL = { 7: 'last 7 days', 28: 'last 4 weeks', 84: 'last 12 weeks' };
@@ -31,29 +31,33 @@
   Object.assign(GOOD, { sale_loss: 'low', refund: 'low', guest_value: 'low', est_lost_orders: 'low', est_lost_value: 'low', offline_hours: 'low', unique_pct: 'low', rating_n: 'high', orders: 'high' });
   const status = (k, v) => { const t = TH[k]; if (!t || v == null) return ''; const [dir, warn, bad] = t; if (dir === 'low') return v > bad ? 'bad' : v > warn ? 'warn' : 'ok'; return v < bad ? 'bad' : v < warn ? 'warn' : 'ok'; };
   const deltaClass = (k, d) => { if (d == null || d === 0) return ''; const g = GOOD[k] || 'low'; return (g === 'low') === d < 0 ? 'good' : 'poor'; };
-  const SIGNED = { pct: (d) => (d > 0 ? '+' : '') + d.toFixed(1) + ' pt', min: (d) => (d > 0 ? '+' : '') + d.toFixed(1) + ' min', inr: (d) => (d > 0 ? '+' : '−') + '₹' + inr.format(Math.abs(Math.round(d))), int: (d) => (d > 0 ? '+' : '') + d3.format(',')(Math.round(d)), rating: (d) => (d > 0 ? '+' : '') + d.toFixed(2), hours: (d) => (d > 0 ? '+' : '') + d.toFixed(1) + ' h', days: (d) => (d > 0 ? '+' : '') + d, num1: (d) => (d > 0 ? '+' : '') + d.toFixed(1) };
+  const SIGNED = { pct: (d) => (d > 0 ? '+' : '') + d.toFixed(1) + ' pt', min: (d) => (d > 0 ? '+' : '') + d.toFixed(1) + ' min', inr: (d) => (d > 0 ? '+' : '−') + '₹' + inr.format(Math.abs(Math.round(d))), int: (d) => (d > 0 ? '+' : '') + d3.format(',')(Math.round(d)), rating: (d) => (d > 0 ? '+' : '') + d.toFixed(2), hours: (d) => (d > 0 ? '+' : '') + d.toFixed(1) + ' h', days: (d) => (d > 0 ? '+' : '') + (Number.isInteger(d) ? d : d.toFixed(1)) + ' days', num1: (d) => (d > 0 ? '+' : '') + d.toFixed(1) };
 
   /* ---------- calculations (readers can open these in Sources) ---------- */
 
   const dayNum = (s) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 864e5;
   const KPI_SUMS = ['orders', 'cancelled', 'cancelled_value', 'kpt_lt5', 'kpt_5_8', 'kpt_8_10', 'kpt_gt10', 'online_hours', 'budget_hours', 'rating_count', 'refund_amt', 'complaint_orders', 'unique_concern', 'multi_concern', 'product_concern', 'service_concern', 'crit_veg', 'crit_foreign', 'crit_pests', 'l1_quality', 'l1_quantity', 'l1_packaging', 'l1_missing', 'l1_wrong'];
   const KPI_WAVG = ['kpt_avg', 'kpt_peak', 'kpt_offpeak', 'correct_mfr_pct', 'mfr_not_marked_pct', 'handover_avg', 'handover_over3_pct', 'rider_wait_arrival_pct', 'food_wait_mfr_pct', 'food_wait_min', 'tat_avg'];
+  let NET_AOV = 0;   // network average cancelled-order value, set when `kpis` is computed
   const KPI_DELTAS = ['rating', 'rating_n', 'sale_loss', 'refund', 'guest_value', 'cancel_pct', 'completion_pct', 'product_pct', 'service_pct', 'complaint_pct', 'unique_pct', 'multi_pct', 'crit_total', 'kpt', 'kpt_peak', 'kpt_offpeak', 'kpt_gt10_pct', 'vis_pct', 'nonop_days', 'offline_hours', 'est_lost_orders', 'est_lost_value', 'mfr_correct_pct', 'mfr_incorrect_pct', 'mfr_not_marked_pct', 'handover', 'handover_dev', 'over3_pct', 'wait_arr_pct', 'food_wait_pct', 'food_wait_min', 'tat', 'orders'];
 
   /* Every headline figure for one set of daily rows. Shares are percent of orders; time cuts are orders-weighted. */
   function kpiAgg(rows) {
     const N = (x) => +x || 0, r1 = (v) => Math.round(v * 10) / 10, r2 = (v) => Math.round(v * 100) / 100;
-    const s = {}; let nonop = 0, ratingW = 0; const ids = new Set();
+    // non-operational = a day the outlet was planned to open (ideal hours > 0) but was online 0 hours; counted per outlet
+    const s = {}; let nonop = 0, ratingW = 0; const ids = new Set(), planned = new Set(), offline = new Set();
     for (const r of rows) {
       const o = N(r.orders); ids.add(r.restaurant_id);
       for (const k of KPI_SUMS) s[k] = (s[k] || 0) + N(r[k]);
       for (const k of KPI_WAVG) s[k] = (s[k] || 0) + N(r[k]) * o;
-      ratingW += N(r.rating_avg) * N(r.rating_count); if (N(r.online_hours) === 0) nonop++;
+      ratingW += N(r.rating_avg) * N(r.rating_count);
+      if (N(r.budget_hours) > 0) { planned.add(r.restaurant_id); if (N(r.online_hours) === 0) { nonop++; offline.add(r.restaurant_id); } }
     }
     const o = s.orders || 0, pc = (v) => (o ? r1((100 * v) / o) : null), w = (k) => (o ? r1(s[k] / o) : null), ps = (k) => (o ? r1((100 * s[k]) / o) : null);
     const comp = s.complaint_orders || 0, pcomp = (v) => (comp ? r1((100 * v) / comp) : null);
-    const offline = (s.budget_hours || 0) - (s.online_hours || 0), perHr = s.online_hours ? o / s.online_hours : 0;
-    const aov = s.cancelled ? s.cancelled_value / s.cancelled : 0;
+    const offHours = (s.budget_hours || 0) - (s.online_hours || 0), perHr = s.online_hours ? o / s.online_hours : 0;
+    // order value for lost orders: the cancelled-order average (no GMV feed); too few cancellations → the network's
+    const aov = (s.cancelled || 0) >= 20 ? s.cancelled_value / s.cancelled : NET_AOV;
     const crit = (s.crit_veg || 0) + (s.crit_foreign || 0) + (s.crit_pests || 0), pcrit = (v) => (crit ? r1((100 * v) / crit) : null), pc2 = (v) => (o ? r2((100 * v) / o) : null);
     return {
       outlets: ids.size, days: rows.length, orders: o,
@@ -69,8 +73,9 @@
       crit_veg_share: pcrit(s.crit_veg || 0), crit_foreign_share: pcrit(s.crit_foreign || 0), crit_pests_share: pcrit(s.crit_pests || 0),
       kpt: w('kpt_avg'), kpt_peak: w('kpt_peak'), kpt_offpeak: w('kpt_offpeak'),
       kpt_lt5_pct: pc(s.kpt_lt5 || 0), kpt_5_8_pct: pc(s.kpt_5_8 || 0), kpt_8_10_pct: pc(s.kpt_8_10 || 0), kpt_gt10_pct: pc(s.kpt_gt10 || 0),
-      vis_pct: s.budget_hours ? r1((100 * s.online_hours) / s.budget_hours) : null, nonop_days: nonop, offline_hours: r1(offline),
-      est_lost_orders: Math.round(offline * perHr), est_lost_value: Math.round(offline * perHr * aov),
+      vis_pct: s.budget_hours ? r1((100 * s.online_hours) / s.budget_hours) : null, offline_hours: r1(offHours),
+      nonop_days: planned.size ? r1(nonop / planned.size) : null, nonop_outlet_days: nonop, nonop_outlets: offline.size, outlets_planned: planned.size,
+      est_lost_orders: Math.round(offHours * perHr), est_lost_value: Math.round(offHours * perHr * aov),
       mfr_correct_pct: ps('correct_mfr_pct'), mfr_incorrect_pct: o ? r1(100 - (100 * s.correct_mfr_pct) / o) : null, mfr_not_marked_pct: ps('mfr_not_marked_pct'),
       handover: w('handover_avg'), handover_dev: o ? r1(s.handover_avg / o - 3) : null, over3_pct: ps('handover_over3_pct'), wait_arr_pct: ps('rider_wait_arrival_pct'), food_wait_pct: ps('food_wait_mfr_pct'), food_wait_min: w('food_wait_min'),
       tat: w('tat_avg'),
@@ -95,6 +100,8 @@
     description: 'kpiFor() for the network and every outlet × period (last 7 / 28 / 84 days) × day type. A multi-outlet brand / city / outlet selection is computed on demand with the same function.',
     inputs: ['daily', 'restaurants'],
     fn: (daily, restaurants) => {
+      const cv = d3.sum(daily, (r) => +r.cancelled_value || 0), cn = d3.sum(daily, (r) => +r.cancelled || 0);
+      NET_AOV = cn ? cv / cn : 0;
       const known = new Set(restaurants.map((r) => r.restaurant_id)), byOutlet = d3.group(daily, (r) => r.restaurant_id);
       const end = d3.max(daily, (r) => dayNum(r.day));
       const scopes = [['all', daily.filter((r) => known.has(r.restaurant_id))], ...restaurants.map((r) => [r.restaurant_id, byOutlet.get(r.restaurant_id) || []])];
@@ -250,7 +257,7 @@
     refund: [{ label: 'Refunded ₹', field: 'refund', fmt: 'inr', nostatus: true }],
     tat: [{ label: 'Actual TAT', field: 'tat', fmt: 'min' }],
     kpt: [{ label: 'KPT', field: 'kpt', fmt: 'min' }, { label: 'Peak', field: 'kpt_peak', fmt: 'min' }, { label: '> 10 min', field: 'kpt_gt10_pct', fmt: 'pct' }],
-    vis: [{ label: 'Visibility', field: 'vis_pct', fmt: 'pct' }, { label: 'Non-op days', field: 'nonop_days', fmt: 'days' }],
+    vis: [{ label: 'Visibility', field: 'vis_pct', fmt: 'pct' }, { label: 'Non-op days / outlet', field: 'nonop_days', fmt: 'days' }],
     mfr: [{ label: 'Correct MFR', field: 'mfr_correct_pct', fmt: 'pct' }, { label: 'Handover', field: 'handover', fmt: 'min' }, { label: 'Food waited', field: 'food_wait_pct', fmt: 'pct' }],
     oos: [{ label: 'OOS cancels', field: 'pct', fmt: 'pct', source: 'cancel_mix', level: 'group', name: 'RDC_OOS', nostatus: true }],
   };
@@ -266,7 +273,7 @@
   tiles('t-refund', [{ label: 'Total refunded (IGCC)', field: 'refund', fmt: 'inr', big: true, nostatus: true }, { label: 'Complaint orders', field: 'complaints', fmt: 'int', nostatus: true, delta: false }]);
   tiles('t-tat', [{ label: 'Actual average TAT', field: 'tat', fmt: 'min', big: true }]);
   tiles('t-kpt', [{ label: 'Average KPT', field: 'kpt', fmt: 'min', big: true }, { label: 'Peak hours', field: 'kpt_peak', fmt: 'min' }, { label: 'Off-peak', field: 'kpt_offpeak', fmt: 'min' }, { label: 'Orders over 10 min', field: 'kpt_gt10_pct', fmt: 'pct' }]);
-  tiles('t-vis', [{ label: 'Visibility (online ÷ budgeted hours)', field: 'vis_pct', fmt: 'pct', big: true }, { label: 'Non-operational days', field: 'nonop_days', fmt: 'days' }, { label: 'Offline hours', field: 'offline_hours', fmt: 'hours', nostatus: true }, { label: 'Est. orders lost', field: 'est_lost_orders', fmt: 'int', nostatus: true }, { label: 'Est. value lost', field: 'est_lost_value', fmt: 'inr', nostatus: true }]);
+  tiles('t-vis', [{ label: 'Visibility (online ÷ planned hours)', field: 'vis_pct', fmt: 'pct', big: true }, { label: 'Non-op days per outlet', field: 'nonop_days', fmt: 'days' }, { label: 'Outlets with a non-op day', field: 'nonop_outlets', fmt: 'int', nostatus: true, delta: false }, { label: 'Offline hours (total)', field: 'offline_hours', fmt: 'hours', nostatus: true }, { label: 'Est. orders lost', field: 'est_lost_orders', fmt: 'int', nostatus: true }, { label: 'Est. value lost', field: 'est_lost_value', fmt: 'inr', nostatus: true }]);
   tiles('t-mfr', [{ label: 'Correct MFR', field: 'mfr_correct_pct', fmt: 'pct', big: true }, { label: 'Incorrect MFR', field: 'mfr_incorrect_pct', fmt: 'pct' }, { label: 'MFR not marked', field: 'mfr_not_marked_pct', fmt: 'pct' }]);
   tiles('t-handover', [{ label: 'Average handover', field: 'handover', fmt: 'min', big: true }, { label: 'Deviation from 3 min', field: 'handover_dev', fmt: 'min' }, { label: 'Orders over 3 min', field: 'over3_pct', fmt: 'pct' }, { label: 'Rider waited after arrival', field: 'wait_arr_pct', fmt: 'pct' }, { label: 'Food waited after MFR', field: 'food_wait_pct', fmt: 'pct' }, { label: 'Food wait minutes', field: 'food_wait_min', fmt: 'min' }]);
   tiles('t-oos', [{ label: "'Item unavailable' share of cancellations", field: 'pct', fmt: 'pct', source: 'cancel_mix', level: 'group', name: 'RDC_OOS', nostatus: true, big: true, delta: false }, { label: 'OOS-tagged cancellations', field: 'orders', fmt: 'int', source: 'cancel_mix', level: 'group', name: 'RDC_OOS', nostatus: true, delta: false }]);
@@ -405,6 +412,7 @@
       for (const k of ['kpt_avg', 'kpt_peak', 'kpt_offpeak', 'correct_mfr_pct', 'handover_avg', 'handover_over3_pct', 'food_wait_mfr_pct', 'tat_avg']) e.s[k] = (e.s[k] || 0) + N(r[k]) * o;
       for (const k of ['cancelled', 'cancelled_value', 'refund_amt', 'product_concern', 'service_concern', 'online_hours', 'budget_hours', 'crit_veg', 'crit_foreign', 'crit_pests', 'kpt_lt5', 'kpt_5_8', 'kpt_8_10', 'kpt_gt10', 'rating_count']) e.s[k] = (e.s[k] || 0) + N(r[k]);
       e.s.rating_w = (e.s.rating_w || 0) + N(r.rating_avg) * N(r.rating_count);
+      e.s.planned = (e.s.planned || 0) + (N(r.budget_hours) > 0 ? 1 : 0);   // outlets due to open that day
       byDay.set(d, e);
     }
     const list = [...byDay.values()].sort((a, b) => a.d - b.d);
@@ -554,8 +562,7 @@
 
     // ---- Input: KPT
     const parts = (f) => [['breakfast', 'Breakfast'], ['lunch', 'Lunch'], ['snacks', 'Snacks'], ['dinner', 'Dinner'], ['late', 'Late night'], ['peak', 'Peak hrs'], ['offpeak', 'Off-peak']].map(([k, l]) => { const r = hc.find((x) => x.daytype === p.daytype && x.part === k); return { label: l, v: r ? r[f] : null, n: r ? r.orders : 0, key: k }; });
-    if (vis('c-kpt-parts')) C.parts($('c-kpt-parts'), parts('kpt'), { fmt: F.num1, color: (x) => (x.key === 'peak' ? dash.colors[3] : x.key === 'offpeak' ? dash.colors[2] : dash.colors[0]) });
-    if (vis('c-kpt-heat')) { const h = rows('hourly').filter((r) => ids.has(r.restaurant_id) && (p.daytype === 'all' || (p.daytype === 'weekend') === (N(r.weekday) >= 5))); const hours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 0, 1]; const g = d3.rollup(h, (v) => ({ o: d3.sum(v, (r) => N(r.orders)), k: d3.sum(v, (r) => N(r.kpt_avg) * N(r.orders)) }), (r) => N(r.weekday), (r) => N(r.hour)); const cells = []; WD.forEach((w, ri) => hours.forEach((hh, ci) => { const e = g.get(ri) && g.get(ri).get(hh); cells.push({ row: ri, col: ci, v: e && e.o ? e.k / e.o : null, n: e ? e.o : 0 }); })); C.heatmap($('c-kpt-heat'), cells, WD, hours.map(String), { fmt: F.min, color: dash.colors[3] }); }
+    if (vis('c-kpt-parts')) C.parts($('c-kpt-parts'), parts('kpt').filter((x) => x.key !== 'breakfast'), { fmt: F.num1, color: (x) => (x.key === 'peak' ? dash.colors[3] : x.key === 'offpeak' ? dash.colors[2] : dash.colors[0]) });
     if (vis('c-kpt-line')) C.line($('c-kpt-line'), pair('kpt_avg', 'w'), { fmt: F.min, ref: { v: 8, label: 'target 8 min' } });
     if (vis('c-kpt-peak')) C.line($('c-kpt-peak'), [{ name: 'Peak', color: dash.colors[3], points: S.map((x) => ({ d: x.d, v: x.w('kpt_peak') })) }, { name: 'Off-peak', color: dash.colors[2], points: S.map((x) => ({ d: x.d, v: x.w('kpt_offpeak') })) }], { fmt: F.min });
     const BK = [{ key: 'b0', label: '< 5', color: dash.colors[2] }, { key: 'b1', label: '5–8', color: dash.colors[0] }, { key: 'b2', label: '8–10', color: dash.colors[1] }, { key: 'b3', label: '> 10', color: dash.colors[3] }];
@@ -563,8 +570,10 @@
     if (vis('c-kpt-weekly')) C.stackedWeekly($('c-kpt-weekly'), W.map((w) => ({ d: w.d, parts: { b0: w.s.kpt_lt5, b1: w.s.kpt_5_8, b2: w.s.kpt_8_10, b3: w.s.kpt_gt10 } })), BK, { share: true, h: 150 });
 
     // ---- Input: visibility
-    if (vis('c-vis-line')) C.line($('c-vis-line'), [{ name: 'Online hours', color: dash.colors[2], points: S.map((x) => ({ d: x.d, v: ids.size ? (x.day.s.online_hours || 0) / ids.size : null })) }], { fmt: F.hours, y0: true, shade: weekendDays, ref: { v: 16, label: 'budget 16 h' }, endLabels: false });
-    if (vis('c-vis-cal')) C.calendar($('c-vis-cal'), S.map((x) => ({ d: x.d, hours: ids.size ? (x.day.s.online_hours || 0) / ids.size : 0, budget: ids.size ? (x.day.s.budget_hours || 0) / ids.size : 16, v: x.day.s.budget_hours ? (x.day.s.online_hours || 0) / x.day.s.budget_hours : 0 })));
+    // hours per outlet that was due to open that day (not per outlet in the selection, which dilutes it)
+    const perOutlet = (x, k) => (x.day.s.planned ? (x.day.s[k] || 0) / x.day.s.planned : null);
+    if (vis('c-vis-line')) C.line($('c-vis-line'), [{ name: 'Online', color: dash.colors[2], points: S.map((x) => ({ d: x.d, v: perOutlet(x, 'online_hours') })) }, { name: 'Planned', muted: true, dashed: true, points: S.map((x) => ({ d: x.d, v: perOutlet(x, 'budget_hours') })) }], { fmt: F.hours, y0: true, shade: weekendDays });
+    if (vis('c-vis-cal')) C.calendar($('c-vis-cal'), S.map((x) => ({ d: x.d, hours: perOutlet(x, 'online_hours') || 0, budget: perOutlet(x, 'budget_hours') || 0, v: x.day.s.budget_hours ? (x.day.s.online_hours || 0) / x.day.s.budget_hours : 0 })));
     if (vis('c-vis-weekly')) C.bars($('c-vis-weekly'), W.map((w) => ({ d: w.d, v: w.s.online_hours ? Math.round(((w.s.budget_hours - w.s.online_hours) * w.s.orders) / w.s.online_hours) : 0 })), { fmt: F.int, color: () => dash.colors[2] });
 
     // ---- Input: MFR
