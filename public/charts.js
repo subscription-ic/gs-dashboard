@@ -28,7 +28,8 @@
   }
   function textW(svg, s, size) {
     const t = svg.append('text').attr('font-size', size).text(s);
-    const w = t.node().getComputedTextLength(); t.remove(); return w;
+    const w = t.node().getComputedTextLength(); t.remove();
+    return w || String(s).length * size * 0.58;   // 0 when the browser can't measure yet: estimate instead
   }
   const measure = (svg, labels, size) => Math.max(0, ...labels.map((l) => textW(svg, l, size)));
 
@@ -119,7 +120,10 @@
     // a label wider than its column is cut with "…" so it never runs into the bar; hovering the row shows it in full
     const fit = (s) => { const max = labW - 10; if (textW(svg, s, 12) <= max) return s; let t = s; while (t.length > 1 && textW(svg, t + '…', 12) > max) t = t.slice(0, -1); return t.trimEnd() + '…'; };
     g.append('title').text((d) => `${d.label} · ${fmt(d.value)}${d.sub ? ' · ' + d.sub : ''}`);
-    g.append('text').attr('x', 4).attr('y', rowH / 2 + 4).attr('font-size', 12).attr('fill', 'var(--color-fg)').text((d) => fit(d.label));
+    // and clipped to the label column, so even a mis-measured label can't be drawn over the bar
+    const clip = 'lab-' + Math.random().toString(36).slice(2);
+    svg.append('defs').append('clipPath').attr('id', clip).append('rect').attr('x', 0).attr('y', 0).attr('width', labW - 6).attr('height', rowH);
+    g.append('text').attr('x', 4).attr('y', rowH / 2 + 4).attr('font-size', 12).attr('fill', 'var(--color-fg)').attr('clip-path', `url(#${clip})`).text((d) => fit(d.label));
     g.append('rect').attr('x', labW).attr('y', rowH / 2 - 7).attr('height', 14).attr('rx', 4).attr('width', (d) => Math.max(2, x(d.value))).attr('fill', (d) => d.color || dash.colors[0]);
     g.append('text').attr('x', (d) => labW + Math.max(2, x(d.value)) + 6).attr('y', rowH / 2 + 4).attr('font-size', 11).attr('fill', 'var(--color-fg)').text((d) => fmt(d.value));
     g.append('text').attr('x', (d) => labW + Math.max(2, x(d.value)) + 6 + textW(svg, fmt(d.value), 11) + 6).attr('y', rowH / 2 + 4).attr('font-size', 11).attr('fill', 'var(--color-fg-muted)').text((d) => d.sub || '');
