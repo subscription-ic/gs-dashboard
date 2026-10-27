@@ -635,9 +635,9 @@
         <svg class="lb-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></div>`;
       if (open) {
         const label = (f, l) => (f === 'rating' && r.rating != null ? `${l} <span class="lb-stars">${'★'.repeat(Math.round(r.rating))}${'☆'.repeat(5 - Math.round(r.rating))}</span>` : l);
-        // Outcome: rating keeps its network bar; the totals become stat cards with their change, then the rating trend
+        // Outcome: rating keeps its network bar; the totals become stat cards with their change
         const stat = ([f, l, fmt]) => { const d = r[f + '_d']; return `<div class="lb-stat"><span class="n">${l}</span>${m(r.scope, f, F[fmt](r[f]), 'v')}${d == null ? '' : `<span class="dv ${deltaClass(f, d)}">${(SIGNED[fmt] || SIGNED.num1)(d)}</span>`}</div>`; };
-        const extra = (key) => (key !== 'outcome' ? '' : `<div class="lb-stats">${LBT.outcome.filter(([f]) => NO_NET.has(f)).map(stat).join('')}</div><div class="lb-spark-h">Rating trend <span>7-day rolling · grey = network</span></div><div class="lb-spark" data-id="${r.scope}"></div>`);
+        const extra = (key) => (key !== 'outcome' ? '' : `<div class="lb-stats">${LBT.outcome.filter(([f]) => NO_NET.has(f)).map(stat).join('')}</div>`);
         const tier = (key, title, sub, color) => `<div class="lb-tier" style="--tier:${color}"><h4>${title}<small>${sub}</small></h4>` + LBT[key].filter(([f]) => key !== 'outcome' || !NO_NET.has(f)).map(([f, l, fmt]) => `<div class="lb-m"><span class="n">${label(f, l)}</span>${m(r.scope, f, F[fmt](r[f]), 'v ' + status(f, r[f]))}` + (NO_NET.has(f) ? '<span class="net"></span></div>' : `<span class="net">${net ? m('all', f, F[fmt](net[f])) : '—'} net</span><div class="db" data-f="${f}"></div></div>`)).join('') + extra(key) + '</div>';
         html += `<div class="lb-diag open" data-id="${r.scope}">${tier('input', 'Input', 'operational causes', dash.colors[2])}${tier('output', 'Output', '→ what went wrong', dash.colors[1])}${tier('outcome', 'Outcome', '→ what the customer sees', dash.colors[0])}
           <div class="lb-actions">${info.single === r.scope ? `${p.outlet.length ? `<button type="button" data-clearfocus="1">Back to ${brandCity ? 'all outlets in the filter' : 'network view'}</button>` : ''}<span>Every chart on the page is showing this outlet.</span>` : `<button type="button" data-focus="${r.scope}">Focus every chart on ${rr.name}</button><span>Dot = outlet, grey dot = network; red when worse.</span>`}</div></div>`;
@@ -646,13 +646,6 @@
     }).join('') + (more > 0 ? `<div class="lb-more"><button type="button" data-more="1">Show ${Math.min(LB_STEP, more)} more</button><span>${limit} of ${list.length} outlets shown</span></div>` : '');
     // dumbbells
     box.querySelectorAll('.lb-diag').forEach((d) => { const r = list.find((x) => x.scope === d.dataset.id); d.querySelectorAll('.db').forEach((db) => { const f = db.dataset.f; const [lo, hi] = ext[f]; C.dumbbell(db, r[f], net ? net[f] : null, lo, hi, GOOD[f] || 'low'); }); });
-    // rating trend in an open row: the outlet's 7-day rolling rating against the network's
-    const daily = rows('daily');
-    box.querySelectorAll('.lb-spark').forEach((el) => {
-      const own = dailySeries(daily, new Set([el.dataset.id]), p, p.end);
-      const nets = cached('lbnet', [daily, restaurants, p.end, p.period, p.daytype], () => dailySeries(daily, new Set(restaurants.map((x) => x.restaurant_id)), p, p.end));
-      C.line(el, [{ name: 'Outlet', color: dash.colors[0], points: own.map((x) => ({ d: x.d, v: x.rating })) }, { name: 'Network', muted: true, points: nets.map((x) => ({ d: x.d, v: x.rating })) }], { fmt: F.rating, h: 120, ref: { v: 4.3, label: 'target 4.30' } });
-    });
   }
 
   dash.onData(draw);
