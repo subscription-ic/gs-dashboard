@@ -84,7 +84,7 @@
 
   <!-- INPUT -->
   <section class="tier" id="input" data-tab="input" role="tabpanel">
-    <div class="tier-head"><h2>Input</h2><p>What the kitchen controls: prep time, being online, marking food ready, handover, stock.</p></div>
+    <div class="tier-head"><h2>Input</h2><p>What the kitchen controls: prep time, being online, marking food ready, handover, time to pickup, stock.</p></div>
 
     <div class="grp" id="grp-kpt" data-open="1">
       <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">KPT<small>Order placed → food marked ready</small></span><span class="grp-sum" id="sum-kpt"></span><span class="grp-avail" id="avail-kpt"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
@@ -128,6 +128,17 @@
       </div>
     </div>
 
+    <div class="grp" id="grp-tat" data-open="0">
+      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">TAT<small>Order placed → rider pickup</small></span><span class="grp-sum" id="sum-tat"></span><span class="grp-avail" id="avail-tat"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Actual TAT</h3><div class="ops-tiles" id="t-tat"></div><div class="ops-inline">Ideal TAT <input type="number" id="ideal-tat" min="5" max="60" step="0.5" value="18" aria-label="Ideal TAT in minutes"> min <span>— not defined in the sheet; set it here.</span></div></div>
+          <div class="ops-card wide"><h3>TAT per day vs ideal <span class="n">restaurant-side · delivered time only for complaint orders</span></h3><div class="ops-chart" id="c-tat-line" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-tat"></div>
+      </div>
+    </div>
+
     <div class="grp" id="grp-oos" data-open="0">
       <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">Out of stock<small>Swiggy OOS report — not loaded</small></span><span class="grp-sum" id="sum-oos"></span><span class="grp-avail" id="avail-oos"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
       <div class="grp-body">
@@ -141,7 +152,7 @@
 
   <!-- OUTPUT -->
   <section class="tier" id="output" data-tab="output" role="tabpanel">
-    <div class="tier-head"><h2>Output</h2><p>What went wrong on orders: complaints, critical incidents, cancellations, refunds and time to deliver.</p></div>
+    <div class="tier-head"><h2>Output</h2><p>What went wrong on orders: complaints, critical incidents, cancellations, sale loss and refunds.</p></div>
 
     <div class="grp" id="grp-concerns" data-open="1">
       <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">Concerns<small>IGCC complaint orders</small></span><span class="grp-sum" id="sum-concerns"></span><span class="grp-avail" id="avail-concerns"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
@@ -188,6 +199,18 @@
       </div>
     </div>
 
+    <div class="grp" id="grp-saleloss" data-open="1">
+      <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">Sale loss<small>RDC cancellations</small></span><span class="grp-sum" id="sum-saleloss"></span><span class="grp-avail" id="avail-saleloss"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Cancelled order value</h3><div class="ops-tiles" id="t-saleloss"></div><p class="ops-note">Absolute ₹ only — % of sales needs total GMV from the payout file.</p></div>
+          <div class="ops-card"><h3>Sale loss ₹ by reason <span class="n">cancelled value · red = out of stock · weekly feed</span></h3><div class="ops-chart auto" id="c-saleloss-reasons" data-source="cancellations"></div></div>
+          <div class="ops-card wide"><h3>Cancelled value per day <span class="n">₹</span></h3><div class="ops-chart" id="c-saleloss-line" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-saleloss"></div>
+      </div>
+    </div>
+
     <div class="grp" id="grp-refund" data-open="0">
       <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">Refund<small>IGCC report</small></span><span class="grp-sum" id="sum-refund"></span><span class="grp-avail" id="avail-refund"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
       <div class="grp-body">
@@ -200,21 +223,11 @@
       </div>
     </div>
 
-    <div class="grp" id="grp-tat" data-open="0">
-      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">TAT<small>Order placed → rider pickup</small></span><span class="grp-sum" id="sum-tat"></span><span class="grp-avail" id="avail-tat"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-      <div class="grp-body">
-        <div class="ops-grid">
-          <div class="ops-card"><h3>Actual TAT</h3><div class="ops-tiles" id="t-tat"></div><div class="ops-inline">Ideal TAT <input type="number" id="ideal-tat" min="5" max="60" step="0.5" value="18" aria-label="Ideal TAT in minutes"> min <span>— not defined in the sheet; set it here.</span></div></div>
-          <div class="ops-card wide"><h3>TAT per day vs ideal <span class="n">restaurant-side · delivered time only for complaint orders</span></h3><div class="ops-chart" id="c-tat-line" data-source="daily"></div></div>
-        </div>
-        <div class="ops-na" id="na-tat"></div>
-      </div>
-    </div>
   </section>
 
   <!-- OUTCOME -->
   <section class="tier" id="outcome" data-tab="outcome" role="tabpanel">
-    <div class="tier-head"><h2>Outcome</h2><p>Rating, lost sales and value given back — the result of everything above.</p></div>
+    <div class="tier-head"><h2>Outcome</h2><p>Rating and value given back — the result of everything above.</p></div>
 
     <div class="grp" id="grp-rating" data-open="1">
       <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">Rating<small>Swiggy rating feed</small></span><span class="grp-sum" id="sum-rating"></span><span class="grp-avail" id="avail-rating"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
@@ -224,17 +237,6 @@
           <div class="ops-card wide"><h3>Daily rating vs network <span class="n">7-day rolling · orders-weighted</span></h3><div class="ops-chart tall" id="c-rating-line" data-source="daily"></div></div>
         </div>
         <div class="ops-na" id="na-rating"></div>
-      </div>
-    </div>
-
-    <div class="grp" id="grp-saleloss" data-open="1">
-      <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">Sale loss<small>RDC cancellations</small></span><span class="grp-sum" id="sum-saleloss"></span><span class="grp-avail" id="avail-saleloss"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-      <div class="grp-body">
-        <div class="ops-grid">
-          <div class="ops-card"><h3>Cancelled order value</h3><div class="ops-tiles" id="t-saleloss"></div><p class="ops-note">Absolute ₹ only — % of sales needs total GMV from the payout file.</p></div>
-          <div class="ops-card wide"><h3>Cancelled value per day <span class="n">₹</span></h3><div class="ops-chart" id="c-saleloss-line" data-source="daily"></div></div>
-        </div>
-        <div class="ops-na" id="na-saleloss"></div>
       </div>
     </div>
 

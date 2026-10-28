@@ -28,7 +28,7 @@
     multi_pct: ['low', 0.6, 1.2], tat: ['low', 18, 22], crit_total: ['low', 0.5, 2.5],
   };
   const GOOD = Object.fromEntries(Object.entries(TH).map(([k, v]) => [k, v[0]]));
-  Object.assign(GOOD, { sale_loss: 'low', refund: 'low', guest_value: 'low', est_lost_orders: 'low', est_lost_value: 'low', offline_hours: 'low', offline_per_outlet: 'low', unique_pct: 'low', rating_n: 'high', orders: 'high' });
+  Object.assign(GOOD, { sale_loss: 'low', refund: 'low', guest_value: 'low', est_lost_orders: 'low', est_lost_value: 'low', offline_hours: 'low', offline_per_outlet: 'low', unique_pct: 'low', rating_n: 'high', orders: 'high', complaints: 'low' });
   const status = (k, v) => { const t = TH[k]; if (!t || v == null) return ''; const [dir, warn, bad] = t; if (dir === 'low') return v > bad ? 'bad' : v > warn ? 'warn' : 'ok'; return v < bad ? 'bad' : v < warn ? 'warn' : 'ok'; };
   const deltaClass = (k, d) => { if (d == null || d === 0) return ''; const g = GOOD[k] || 'low'; return (g === 'low') === d < 0 ? 'good' : 'poor'; };
   const SIGNED = { pct: (d) => (d > 0 ? '+' : '') + d.toFixed(1) + ' pt', min: (d) => (d > 0 ? '+' : '') + d.toFixed(1) + ' min', inr: (d) => (Math.round(d) > 0 ? '+' : Math.round(d) < 0 ? '−' : '') + '₹' + inr.format(Math.abs(Math.round(d))), int: (d) => (d > 0 ? '+' : '') + d3.format(',')(Math.round(d)), rating: (d) => (d > 0 ? '+' : '') + d.toFixed(2), hours: (d) => (d > 0 ? '+' : '') + (Math.abs(d) >= 100 ? d3.format(',')(Math.round(d)) : d.toFixed(1)) + ' h', days: (d) => (d > 0 ? '+' : '') + (Number.isInteger(d) ? d : d.toFixed(1)) + ' days', num1: (d) => (d > 0 ? '+' : '') + d.toFixed(1) };
@@ -39,7 +39,7 @@
   const KPI_SUMS = ['orders', 'cancelled', 'cancelled_value', 'kpt_lt5', 'kpt_5_8', 'kpt_8_10', 'kpt_gt10', 'online_hours', 'budget_hours', 'rating_count', 'refund_amt', 'complaint_orders', 'unique_concern', 'multi_concern', 'product_concern', 'service_concern', 'crit_veg', 'crit_foreign', 'crit_pests', 'l1_quality', 'l1_quantity', 'l1_packaging', 'l1_missing', 'l1_wrong'];
   const KPI_WAVG = ['kpt_avg', 'kpt_peak', 'kpt_offpeak', 'correct_mfr_pct', 'mfr_not_marked_pct', 'handover_avg', 'handover_over3_pct', 'rider_wait_arrival_pct', 'food_wait_mfr_pct', 'food_wait_min', 'tat_avg'];
   let NET_AOV = 0;   // network average cancelled-order value, set when `kpis` is computed
-  const KPI_DELTAS = ['rating', 'rating_n', 'sale_loss', 'refund', 'guest_value', 'cancel_pct', 'completion_pct', 'product_pct', 'service_pct', 'complaint_pct', 'unique_pct', 'multi_pct', 'crit_total', 'kpt', 'kpt_peak', 'kpt_offpeak', 'kpt_gt10_pct', 'vis_pct', 'nonop_days', 'offline_hours', 'offline_per_outlet', 'est_lost_orders', 'est_lost_value', 'mfr_correct_pct', 'mfr_incorrect_pct', 'mfr_not_marked_pct', 'handover', 'handover_dev', 'over3_pct', 'wait_arr_pct', 'food_wait_pct', 'food_wait_min', 'tat', 'orders'];
+  const KPI_DELTAS = ['rating', 'rating_n', 'sale_loss', 'refund', 'guest_value', 'cancel_pct', 'completion_pct', 'product_pct', 'service_pct', 'complaints', 'complaint_pct', 'unique_pct', 'multi_pct', 'crit_total', 'kpt', 'kpt_peak', 'kpt_offpeak', 'kpt_gt10_pct', 'vis_pct', 'nonop_days', 'offline_hours', 'offline_per_outlet', 'est_lost_orders', 'est_lost_value', 'mfr_correct_pct', 'mfr_incorrect_pct', 'mfr_not_marked_pct', 'handover', 'handover_dev', 'over3_pct', 'wait_arr_pct', 'food_wait_pct', 'food_wait_min', 'tat', 'orders'];
 
   /* Every headline figure for one set of daily rows. Shares are percent of orders; time cuts are orders-weighted. */
   function kpiAgg(rows) {
@@ -238,22 +238,24 @@
 
   // Causal chain
   tiles('chain-input-kpis', [
-    { label: 'KPT', field: 'kpt', fmt: 'min', big: true }, { label: 'Orders over 10 min', field: 'kpt_gt10_pct', fmt: 'pct' },
-    { label: 'Visibility', field: 'vis_pct', fmt: 'pct' }, { label: 'Correct MFR', field: 'mfr_correct_pct', fmt: 'pct' }, { label: 'Handover', field: 'handover', fmt: 'min' },
+    { label: 'KPT', field: 'kpt', fmt: 'min', big: true }, { label: 'Peak KPT', field: 'kpt_peak', fmt: 'min' }, { label: 'Orders over 10 min', field: 'kpt_gt10_pct', fmt: 'pct' },
+    { label: 'Visibility', field: 'vis_pct', fmt: 'pct' }, { label: 'Correct MFR', field: 'mfr_correct_pct', fmt: 'pct' }, { label: 'Handover', field: 'handover', fmt: 'min' }, { label: 'TAT', field: 'tat', fmt: 'min' },
   ]);
   tiles('chain-output-kpis', [
-    { label: 'Product concern', field: 'product_pct', fmt: 'pct', big: true }, { label: 'Service concern', field: 'service_pct', fmt: 'pct' },
-    { label: 'Critical incidents', field: 'crit_total', fmt: 'int' }, { label: 'Cancelled', field: 'cancel_pct', fmt: 'pct' }, { label: 'TAT', field: 'tat', fmt: 'min' },
+    { label: 'Total concerns', field: 'complaint_pct', fmt: 'pct', big: true, tip: () => 'Orders with at least one IGCC complaint ÷ orders' }, { label: 'Total concerns (count)', field: 'complaints', fmt: 'int', nostatus: true, tip: () => 'Orders with at least one IGCC complaint' },
+    { label: 'Product concern', field: 'product_pct', fmt: 'pct' }, { label: 'Service concern', field: 'service_pct', fmt: 'pct' },
+    { label: 'Critical incidents', field: 'crit_total', fmt: 'int' }, { label: 'Cancelled', field: 'cancel_pct', fmt: 'pct' },
+    { label: 'Sale loss', field: 'sale_loss', fmt: 'inr', nostatus: true }, { label: 'Refunds', field: 'refund', fmt: 'inr', nostatus: true },
   ]);
   tiles('chain-outcome-kpis', [
     { label: 'Rating', field: 'rating', fmt: 'rating', big: true, stars: true }, { label: 'Ratings', field: 'rating_n', fmt: 'int', nostatus: true },
-    { label: 'Sale loss', field: 'sale_loss', fmt: 'inr', nostatus: true }, { label: 'Refunds', field: 'refund', fmt: 'inr', nostatus: true },
+    { label: 'Value to guest', field: 'guest_value', fmt: 'inr', nostatus: true, tip: () => 'Refunds + cancelled order value' },
   ]);
   // Group summaries (compact, no delta)
   const SUM = { rating: [{ label: 'Rating', field: 'rating', fmt: 'rating' }, { label: 'Ratings', field: 'rating_n', fmt: 'int', nostatus: true }],
     saleloss: [{ label: 'Cancelled ₹', field: 'sale_loss', fmt: 'inr', nostatus: true }, { label: 'Cancelled', field: 'cancel_pct', fmt: 'pct' }],
     guestvalue: [{ label: 'To guest ₹', field: 'guest_value', fmt: 'inr', nostatus: true }],
-    concerns: [{ label: 'Product', field: 'product_pct', fmt: 'pct' }, { label: 'Service', field: 'service_pct', fmt: 'pct' }, { label: 'Complaint orders', field: 'complaints', fmt: 'int', nostatus: true }],
+    concerns: [{ label: 'Total', field: 'complaint_pct', fmt: 'pct' }, { label: 'Product', field: 'product_pct', fmt: 'pct' }, { label: 'Service', field: 'service_pct', fmt: 'pct' }, { label: 'Concerns', field: 'complaints', fmt: 'int', nostatus: true }],
     critical: [{ label: 'Incidents', field: 'crit_total', fmt: 'int' }],
     cancel: [{ label: 'Cancelled', field: 'cancel_pct', fmt: 'pct' }, { label: 'Completion', field: 'completion_pct', fmt: 'pct' }],
     refund: [{ label: 'Refunded ₹', field: 'refund', fmt: 'inr', nostatus: true }],
@@ -269,7 +271,7 @@
   tiles('t-rating', [{ label: 'Average rating', field: 'rating', fmt: 'rating', big: true, stars: true }, { label: 'Number of ratings', field: 'rating_n', fmt: 'int', nostatus: true }, { label: 'Orders', field: 'orders', fmt: 'int', nostatus: true }]);
   tiles('t-saleloss', [{ label: 'Cancelled order value', field: 'sale_loss', fmt: 'inr', big: true, nostatus: true }, { label: 'Cancelled orders', field: 'cancelled', fmt: 'int', nostatus: true, delta: false }, { label: 'Cancelled %', field: 'cancel_pct', fmt: 'pct' }]);
   tiles('t-guestvalue', [{ label: 'Refunds + cancelled value', field: 'guest_value', fmt: 'inr', big: true, nostatus: true }, { label: 'IGCC refunds', field: 'refund', fmt: 'inr', nostatus: true }, { label: 'Cancelled value', field: 'sale_loss', fmt: 'inr', nostatus: true }]);
-  tiles('t-concerns', [{ label: 'Product concern (quality, quantity)', field: 'product_pct', fmt: 'pct', big: true }, { label: 'Service concern (packaging, missing, wrong)', field: 'service_pct', fmt: 'pct', big: true }, { label: 'Any concern', field: 'complaint_pct', fmt: 'pct' }]);
+  tiles('t-concerns', [{ label: 'Product concern (quality, quantity)', field: 'product_pct', fmt: 'pct', big: true }, { label: 'Service concern (packaging, missing, wrong)', field: 'service_pct', fmt: 'pct', big: true }, { label: 'Total concerns', field: 'complaint_pct', fmt: 'pct' }, { label: 'Total concerns (count)', field: 'complaints', fmt: 'int', nostatus: true }]);
   tiles('t-concern-count', [{ label: 'Unique concern orders', field: 'unique', fmt: 'int', nostatus: true, delta: false }, { label: 'Unique %', field: 'unique_pct', fmt: 'pct', nostatus: true }, { label: 'Multiple concern orders', field: 'multi', fmt: 'int', nostatus: true, delta: false }, { label: 'Multiple %', field: 'multi_pct', fmt: 'pct' }]);
   tiles('t-cancel', [{ label: 'Cancelled %', field: 'cancel_pct', fmt: 'pct', big: true }, { label: 'Order completion', field: 'completion_pct', fmt: 'pct' }, { label: 'Cancelled orders', field: 'cancelled', fmt: 'int', nostatus: true, delta: false }, { label: 'Top reason', field: 'pct', fmt: 'pct', source: 'cancel_mix', level: 'reason', name: '', nostatus: true, delta: false, top: true }]);
   tiles('t-refund', [{ label: 'Total refunded (IGCC)', field: 'refund', fmt: 'inr', big: true, nostatus: true }, { label: 'Complaint orders', field: 'complaints', fmt: 'int', nostatus: true, delta: false }]);
@@ -309,7 +311,7 @@
     mfr: [['Order type (Instant, Std, Train, Bulk…)', 'No order-type column in the Swiggy feeds']],
     oos: [['Product type stock-up %', 'Swiggy OOS report TBD'], ['Stock-out duration', 'OOS report not loaded'], ['Source closure %', 'OOS report not loaded'], ['Status type %', 'OOS report not loaded'], ['Discounted product OOS %', 'OOS report not loaded'], ['OOS vs minimum closing balance', 'OOS report not loaded']],
   };
-  const AVAIL = { rating: [1, 2], saleloss: [1, 2], guestvalue: [1, 2], concerns: [14, 15], critical: [9, 11], cancel: [6, 8], refund: [2, 4], tat: [3, 5], kpt: [7, 9], vis: [3, 5], mfr: [8, 9], oos: [0, 6] };
+  const AVAIL = { rating: [1, 2], saleloss: [2, 3], guestvalue: [1, 2], concerns: [14, 15], critical: [9, 11], cancel: [6, 8], refund: [2, 4], tat: [3, 5], kpt: [7, 9], vis: [3, 5], mfr: [8, 9], oos: [0, 6] };
   Object.entries(NA).forEach(([g, list]) => { $('na-' + g).innerHTML = '<b>Not yet available</b>' + list.map(([l, note]) => `<span title="${note}">${l}<i> · ${note}</i></span>`).join(''); });
   Object.entries(AVAIL).forEach(([g, [a, b]]) => { $('avail-' + g).textContent = `${a} of ${b} sub-metrics`; });
 
@@ -516,7 +518,7 @@
     const pair = (key, kind) => { const ser = [{ name, color: dash.colors[0], points: S.map((x) => ({ d: x.d, v: kind === 'w' ? x.w(key) : kind === 'pct' ? x.pct(key) : x.rating })) }]; if (!isNet) ser.push({ name: 'Network', muted: true, points: SN.map((x) => ({ d: x.d, v: kind === 'w' ? x.w(key) : kind === 'pct' ? x.pct(key) : x.rating })) }); return ser; };
     const weekendDays = S.filter((x) => x.d.getUTCDay() === 0 || x.d.getUTCDay() === 6).map((x) => x.d);
 
-    // ---- Outcome
+    // ---- Outcome: rating, value to guest · Output: sale loss per day
     if (vis('c-rating-line')) C.line($('c-rating-line'), pair('rating', 'rating'), { fmt: F.rating, h: 200, ref: { v: 4.3, label: 'target 4.30' } });
     if (vis('c-saleloss-line')) C.line($('c-saleloss-line'), [{ name: 'Cancelled ₹', color: dash.colors[0], points: S.map((x) => ({ d: x.d, v: x.day.s.cancelled_value || 0 })) }], { fmt: F.inr, y0: true, area: true, endLabels: false });
     if (vis('c-guestvalue-weekly')) C.stackedWeekly($('c-guestvalue-weekly'), W.map((w) => ({ d: w.d, parts: { refund: w.s.refund_amt, cancelled: w.s.cancelled_value } })), [{ key: 'refund', label: 'Refunds ₹', color: dash.colors[0] }, { key: 'cancelled', label: 'Cancelled value ₹', color: dash.colors[1] }]);
@@ -560,13 +562,15 @@
     if (vis('c-cancel-donut')) { const m = d3.rollups(canc, (v) => d3.sum(v, (r) => N(r.orders)), (r) => r.cancel_group).sort((a, b) => b[1] - a[1]); C.donut($('c-cancel-donut'), m.map(([l, c]) => ({ label: l, value: c, color: GC[l] || dash.colors[7] }))); }
     if (vis('c-cancel-line')) C.line($('c-cancel-line'), pair('cancelled', 'pct'), { fmt: F.pct, y0: true });
     if (vis('c-cancel-weekly')) { const wk = d3.rollups(canc, (v) => Object.fromEntries(d3.rollups(v, (x) => d3.sum(x, (r) => N(r.orders)), (r) => r.cancel_group)), (r) => r.week).sort((a, b) => a[0].localeCompare(b[0])); C.stackedWeekly($('c-cancel-weekly'), wk.map(([w, parts]) => ({ d: toDate(dayNum(w)), parts })), Object.keys(GC).map((k) => ({ key: k, label: k, color: GC[k] })), { h: 150 }); }
+    // sale loss by reason: cancelled order value per cancellation reason (weekly feed)
+    if (vis('c-saleloss-reasons')) { const valTot = d3.sum(canc, (r) => N(r.value)); const m = d3.rollups(canc, (v) => [d3.sum(v, (r) => N(r.value)), d3.sum(v, (r) => N(r.orders)), v[0].cancel_group], (r) => r.reason).sort((a, b) => b[1][0] - a[1][0]).slice(0, 10); C.ranked($('c-saleloss-reasons'), m.map(([l, [v, c, g]]) => ({ label: l, value: v, sub: `${d3.format('.0%')(v / (valTot || 1))} · ${F.int(c)} orders`, color: g === 'RDC_OOS' ? dash.colors[3] : dash.colors[0] })), { fmt: F.inr }); }
     if (vis('c-cancel-items')) { const ic = rows('item_cancels').filter((r) => ids.has(r.restaurant_id)); const all = d3.sum(ic, (r) => N(r.orders)); const m = d3.rollups(ic, (v) => d3.sum(v, (r) => N(r.orders)), (r) => r.item).sort((a, b) => b[1] - a[1]).slice(0, 10); C.ranked($('c-cancel-items'), m.map(([l, c]) => ({ label: l, value: c, sub: `${d3.format('.1%')(c / (all || 1))} · full period` })), { fmt: F.int }); }
 
     // ---- Output: refund
     if (vis('c-refund-reasons')) { const L1C = Object.fromEntries(L1.map(([k], i) => [k, dash.colors[i]])); const m = d3.rollups(comp, (v) => d3.sum(v, (r) => N(r.refund_amt)), (r) => r.l1 + '|' + r.l2).sort((a, b) => b[1] - a[1]).slice(0, 10); C.ranked($('c-refund-reasons'), m.map(([k, v]) => { const [l1, l2] = k.split('|'); return { label: l2, value: v, sub: L1.find((x) => x[0] === l1)[1], color: L1C[l1] }; }), { fmt: F.inr }); }
     if (vis('c-refund-line')) C.line($('c-refund-line'), [{ name: 'Refund ₹', color: dash.colors[0], points: S.map((x) => ({ d: x.d, v: x.day.s.refund_amt || 0 })) }], { fmt: F.inr, y0: true, area: true, endLabels: false });
 
-    // ---- Output: TAT
+    // ---- Input: TAT
     if (vis('c-tat-line')) C.line($('c-tat-line'), pair('tat_avg', 'w'), { fmt: F.min, ref: { v: state.ideal, label: `ideal ${state.ideal} min` } });
     const varEl = $('ideal-tat').parentElement.querySelector('span'); if (row && row.tat != null) varEl.textContent = `— variance ${(row.tat - state.ideal > 0 ? '+' : '') + (row.tat - state.ideal).toFixed(1)} min vs ideal (ideal not defined in the sheet; set it here).`;
 
@@ -596,12 +600,12 @@
 
   /* ---------- leaderboard ---------- */
   const LBT = {
-    outcome: [['rating', 'Rating', 'rating'], ['rating_n', '# ratings', 'int'], ['sale_loss', 'Cancelled ₹', 'inr'], ['refund', 'Refunds ₹', 'inr']],
-    output: [['product_pct', 'Product concern', 'pct'], ['service_pct', 'Service concern', 'pct'], ['crit_total', 'Critical incidents', 'int'], ['cancel_pct', 'Cancelled', 'pct'], ['tat', 'TAT', 'min']],
-    input: [['kpt', 'KPT', 'min'], ['kpt_gt10_pct', 'Orders > 10 min', 'pct'], ['vis_pct', 'Visibility', 'pct'], ['mfr_correct_pct', 'Correct MFR', 'pct'], ['handover', 'Handover', 'min'], ['food_wait_pct', 'Food waited after MFR', 'pct']],
+    outcome: [['rating', 'Rating', 'rating'], ['rating_n', '# ratings', 'int'], ['guest_value', 'Value to guest ₹', 'inr']],
+    output: [['complaint_pct', 'Total concerns', 'pct'], ['product_pct', 'Product concern', 'pct'], ['service_pct', 'Service concern', 'pct'], ['crit_total', 'Critical incidents', 'int'], ['cancel_pct', 'Cancelled', 'pct'], ['sale_loss', 'Sale loss (cancelled ₹)', 'inr'], ['refund', 'Refunds ₹', 'inr']],
+    input: [['kpt', 'KPT', 'min'], ['kpt_peak', 'Peak KPT', 'min'], ['kpt_gt10_pct', 'Orders > 10 min', 'pct'], ['vis_pct', 'Visibility', 'pct'], ['mfr_correct_pct', 'Correct MFR', 'pct'], ['handover', 'Handover', 'min'], ['food_wait_pct', 'Food waited after MFR', 'pct'], ['tat', 'TAT', 'min']],
   };
   // counts and ₹ are network totals, not a typical outlet, so these rows show the outlet's value without a network comparison
-  const NO_NET = new Set(['rating_n', 'sale_loss', 'refund', 'crit_total']);
+  const NO_NET = new Set(['rating_n', 'sale_loss', 'refund', 'guest_value', 'crit_total']);
   const FLAGS = [['kpt', 'KPT'], ['vis_pct', 'Visibility'], ['mfr_correct_pct', 'MFR'], ['handover', 'Handover'], ['product_pct', 'Product'], ['service_pct', 'Service'], ['cancel_pct', 'Cancels'], ['crit_total', 'Critical']];
   function drawLeaderboard(p, info, kp, net) {
     const box = $('lb-rows');
