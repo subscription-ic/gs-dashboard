@@ -10,7 +10,7 @@ module.exports = {
   daily: {
     title: 'Daily outlet metrics',
     sql: `SELECT restaurant_id, CONVERT(varchar(10), [day], 23) AS [day], weekday, is_weekend, orders, cancelled, cancelled_value,
-            kpt_avg, kpt_lt5, kpt_5_8, kpt_8_10, kpt_gt10, kpt_peak, kpt_offpeak,
+            kpt_avg, kpt_lt5, kpt_5_8, kpt_8_10, kpt_10_12, kpt_gt12, kpt_gt10, kpt_peak, kpt_offpeak,
             online_hours, budget_hours, correct_mfr_pct, mfr_not_marked_pct, handover_avg,
             handover_over3_pct, rider_wait_arrival_pct, food_wait_mfr_pct, food_wait_min, tat_avg,
             rating_avg, rating_count, refund_amt, complaint_orders, unique_concern, multi_concern, product_concern, service_concern,

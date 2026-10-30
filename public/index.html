@@ -29,6 +29,7 @@
   </nav>
   <div class="ops-filters" id="filters">
     <div class="ops-f">Brand <div class="ops-ms" id="f-brand" data-source="restaurants"></div></div>
+    <div class="ops-f">Region <div class="ops-ms" id="f-zone" data-source="restaurants"></div></div>
     <div class="ops-f">State <div class="ops-ms" id="f-state" data-source="restaurants"></div></div>
     <div class="ops-f">City <div class="ops-ms" id="f-city" data-source="restaurants"></div></div>
     <div class="ops-f">Outlet <div class="ops-ms" id="f-outlet" data-source="restaurants"></div></div>
@@ -84,17 +85,19 @@
 
   <!-- INPUT -->
   <section class="tier" id="input" data-tab="input" role="tabpanel">
-    <div class="tier-head"><h2>Input</h2><p>What the kitchen controls: prep time, being online, marking food ready, handover, time to pickup, stock.</p></div>
+    <div class="tier-head"><h2>Input</h2><p>What the kitchen controls: prep and pickup time, being online, marking food ready, handover, stock.</p></div>
 
     <div class="grp" id="grp-kpt" data-open="1">
-      <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">KPT<small>Order placed → food marked ready</small></span><span class="grp-sum" id="sum-kpt"></span><span class="grp-avail" id="avail-kpt"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">KPT<small>Order placed → food ready → rider pickup</small></span><span class="grp-sum" id="sum-kpt"></span><span class="grp-avail" id="avail-kpt"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
       <div class="grp-body">
         <div class="ops-grid">
           <div class="ops-card"><h3>Delivery KPT <span class="n">minutes</span></h3><div class="ops-tiles" id="t-kpt"></div></div>
           <div class="ops-card"><h3>KPT by day part <span class="n">full period · orders-weighted</span></h3><div class="ops-chart short" id="c-kpt-parts" data-source="hourly"></div></div>
           <div class="ops-card"><h3>Peak vs off-peak KPT <span class="n">7-day rolling</span></h3><div class="ops-chart" id="c-kpt-peak" data-source="daily"></div></div>
-          <div class="ops-card"><h3>KPT bucket · orders % <span class="n">&lt;5 · 5–8 · 8–10 · &gt;10 min</span></h3><div class="ops-chart auto" id="c-kpt-bucket" data-source="kpis"></div><p class="ops-note">Bucket edges 5 / 8 / 10 min from the sheet example — to be confirmed (feed has 5-min buckets).</p></div>
+          <div class="ops-card"><h3>KPT bucket · orders % <span class="n">&lt;5 · 5–8 · 8–10 · 10–12 · 12+ min</span></h3><div class="ops-chart auto" id="c-kpt-bucket" data-source="kpis"></div><p class="ops-note">Bucket edges 5 / 8 / 10 / 12 min.</p></div>
           <div class="ops-card"><h3>KPT buckets per week</h3><div class="ops-chart" id="c-kpt-weekly" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Order → pickup time <span class="n">order placed → rider picks up</span></h3><div class="ops-tiles" id="t-tat"></div><div class="ops-inline">Ideal <input type="number" id="ideal-tat" min="5" max="60" step="0.5" value="18" aria-label="Ideal order to pickup time in minutes"> min <span>— not defined in the sheet; set it here.</span></div></div>
+          <div class="ops-card wide"><h3>Order → pickup time per day vs ideal <span class="n">7-day rolling</span></h3><div class="ops-chart" id="c-tat-line" data-source="daily"></div></div>
         </div>
         <div class="ops-na" id="na-kpt"></div>
       </div>
@@ -117,25 +120,14 @@
       <div class="grp-body">
         <div class="ops-grid">
           <div class="ops-card"><h3>MFR accuracy</h3><div class="ops-tiles" id="t-mfr"></div></div>
-          <div class="ops-card"><h3>Handover <span class="n">rider arrival → pickup · ideal 3 min</span></h3><div class="ops-tiles" id="t-handover"></div></div>
           <div class="ops-card"><h3>Correct MFR by day part <span class="n">full period</span></h3><div class="ops-chart short" id="c-mfr-parts" data-source="hourly"></div></div>
-          <div class="ops-card"><h3>Handover by day part <span class="n">full period · minutes</span></h3><div class="ops-chart short" id="c-ho-parts" data-source="hourly"></div></div>
           <div class="ops-card"><h3>Correct MFR % per day <span class="n">7-day rolling vs network</span></h3><div class="ops-chart" id="c-mfr-line" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Handover <span class="n">rider arrival → pickup · ideal 3 min</span></h3><div class="ops-tiles" id="t-handover"></div></div>
+          <div class="ops-card"><h3>Handover by day part <span class="n">full period · minutes</span></h3><div class="ops-chart short" id="c-ho-parts" data-source="hourly"></div></div>
           <div class="ops-card"><h3>Handover minutes per day <span class="n">7-day rolling · 3-min reference</span></h3><div class="ops-chart" id="c-ho-line" data-source="daily"></div></div>
           <div class="ops-card wide"><h3>Who waits for whom <span class="n">share of orders · 7-day rolling</span></h3><div class="ops-chart" id="c-wait-line" data-source="daily"></div></div>
         </div>
         <div class="ops-na" id="na-mfr"></div>
-      </div>
-    </div>
-
-    <div class="grp" id="grp-tat" data-open="0">
-      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">TAT<small>Order placed → rider pickup</small></span><span class="grp-sum" id="sum-tat"></span><span class="grp-avail" id="avail-tat"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
-      <div class="grp-body">
-        <div class="ops-grid">
-          <div class="ops-card"><h3>Actual TAT</h3><div class="ops-tiles" id="t-tat"></div><div class="ops-inline">Ideal TAT <input type="number" id="ideal-tat" min="5" max="60" step="0.5" value="18" aria-label="Ideal TAT in minutes"> min <span>— not defined in the sheet; set it here.</span></div></div>
-          <div class="ops-card wide"><h3>TAT per day vs ideal <span class="n">restaurant-side · delivered time only for complaint orders</span></h3><div class="ops-chart" id="c-tat-line" data-source="daily"></div></div>
-        </div>
-        <div class="ops-na" id="na-tat"></div>
       </div>
     </div>
 
@@ -227,7 +219,7 @@
 
   <!-- OUTCOME -->
   <section class="tier" id="outcome" data-tab="outcome" role="tabpanel">
-    <div class="tier-head"><h2>Outcome</h2><p>Rating and value given back — the result of everything above.</p></div>
+    <div class="tier-head"><h2>Outcome</h2><p>Rating, daily sales and value given back — the result of everything above.</p></div>
 
     <div class="grp" id="grp-rating" data-open="1">
       <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">Rating<small>Swiggy rating feed</small></span><span class="grp-sum" id="sum-rating"></span><span class="grp-avail" id="avail-rating"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
@@ -237,6 +229,17 @@
           <div class="ops-card wide"><h3>Daily rating vs network <span class="n">7-day rolling · orders-weighted</span></h3><div class="ops-chart tall" id="c-rating-line" data-source="daily"></div></div>
         </div>
         <div class="ops-na" id="na-rating"></div>
+      </div>
+    </div>
+
+    <div class="grp" id="grp-sales" data-open="1">
+      <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">Daily sales<small>ADT · ADS per outlet</small></span><span class="grp-sum" id="sum-sales"></span><span class="grp-avail" id="avail-sales"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Average daily transactions and sales <span class="n">per outlet per selling day</span></h3><div class="ops-tiles" id="t-sales"></div><p class="ops-note">ADT = delivered orders ÷ outlet-days with orders. ADS is an estimate: ADT × average order value, using the cancelled-order average (the network's when there are under 20 cancellations) — the database has no sales value for delivered orders yet.</p></div>
+          <div class="ops-card wide"><h3>ADT per day <span class="n">7-day rolling vs network</span></h3><div class="ops-chart" id="c-adt-line" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-sales"></div>
       </div>
     </div>
 

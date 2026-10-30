@@ -14,7 +14,7 @@
 
    Definitions:
      Orders         = every order in fact_orders (delivered + cancelled); time metrics use delivered orders only
-     KPT            = fact_orders.kpt_min (OrderedTime → MFRTime); buckets <5 / 5–8 / 8–10 / ≥10 min
+     KPT            = fact_orders.kpt_min (OrderedTime → MFRTime); buckets <5 / 5–8 / 8–10 / 10–12 / ≥12 min (≥10 kept for the over-10 share)
      Peak hours     = fact_orders.is_peak_hour (12:00–14:59 and 19:00–21:59)
      Correct MFR    = fact_mfr_daily.correct_mfr_pct_swiggy; where Swiggy has no figure, share of orders marked
                       ready before rider arrival (also the hourly cut, which Swiggy doesn't report)
@@ -109,6 +109,8 @@ ord AS (
     SUM(CASE WHEN is_cancelled = 0 AND kpt_min <  5 THEN 1 ELSE 0 END)           AS kpt_lt5,
     SUM(CASE WHEN is_cancelled = 0 AND kpt_min >= 5 AND kpt_min < 8 THEN 1 ELSE 0 END)  AS kpt_5_8,
     SUM(CASE WHEN is_cancelled = 0 AND kpt_min >= 8 AND kpt_min < 10 THEN 1 ELSE 0 END) AS kpt_8_10,
+    SUM(CASE WHEN is_cancelled = 0 AND kpt_min >= 10 AND kpt_min < 12 THEN 1 ELSE 0 END) AS kpt_10_12,
+    SUM(CASE WHEN is_cancelled = 0 AND kpt_min >= 12 THEN 1 ELSE 0 END)          AS kpt_gt12,
     SUM(CASE WHEN is_cancelled = 0 AND kpt_min >= 10 THEN 1 ELSE 0 END)          AS kpt_gt10,
     AVG(CASE WHEN is_cancelled = 0 AND is_peak = 1 THEN kpt_min END)             AS kpt_peak,
     AVG(CASE WHEN is_cancelled = 0 AND is_peak = 0 THEN kpt_min END)             AS kpt_offpeak,
@@ -156,7 +158,7 @@ SELECT
   DATEDIFF(DAY, '19000101', d.[day]) % 7                                                 AS weekday,
   CASE WHEN DATEDIFF(DAY, '19000101', d.[day]) % 7 >= 5 THEN 1 ELSE 0 END                AS is_weekend,
   ISNULL(o.orders, 0) AS orders, ISNULL(o.cancelled, 0) AS cancelled, ISNULL(o.cancelled_value, 0) AS cancelled_value,
-  o.kpt_avg, ISNULL(o.kpt_lt5, 0) AS kpt_lt5, ISNULL(o.kpt_5_8, 0) AS kpt_5_8, ISNULL(o.kpt_8_10, 0) AS kpt_8_10, ISNULL(o.kpt_gt10, 0) AS kpt_gt10,
+  o.kpt_avg, ISNULL(o.kpt_lt5, 0) AS kpt_lt5, ISNULL(o.kpt_5_8, 0) AS kpt_5_8, ISNULL(o.kpt_8_10, 0) AS kpt_8_10, ISNULL(o.kpt_10_12, 0) AS kpt_10_12, ISNULL(o.kpt_gt12, 0) AS kpt_gt12, ISNULL(o.kpt_gt10, 0) AS kpt_gt10,
   o.kpt_peak, o.kpt_offpeak,
   ISNULL(a.actual_open_hrs, 0) AS online_hours, ISNULL(a.ideal_open_hrs, 0) AS budget_hours,
   COALESCE(m.correct_mfr_pct_swiggy, o.correct_mfr_proxy)                                AS correct_mfr_pct,   -- 0–1

@@ -28,7 +28,7 @@
     multi_pct: ['low', 0.6, 1.2], tat: ['low', 18, 22], crit_total: ['low', 0.5, 2.5],
   };
   const GOOD = Object.fromEntries(Object.entries(TH).map(([k, v]) => [k, v[0]]));
-  Object.assign(GOOD, { sale_loss: 'low', refund: 'low', guest_value: 'low', est_lost_orders: 'low', est_lost_value: 'low', offline_hours: 'low', offline_per_outlet: 'low', unique_pct: 'low', rating_n: 'high', orders: 'high', complaints: 'low' });
+  Object.assign(GOOD, { sale_loss: 'low', refund: 'low', guest_value: 'low', est_lost_orders: 'low', est_lost_value: 'low', offline_hours: 'low', offline_per_outlet: 'low', unique_pct: 'low', rating_n: 'high', orders: 'high', complaints: 'low', adt: 'high', ads: 'high' });
   const status = (k, v) => { const t = TH[k]; if (!t || v == null) return ''; const [dir, warn, bad] = t; if (dir === 'low') return v > bad ? 'bad' : v > warn ? 'warn' : 'ok'; return v < bad ? 'bad' : v < warn ? 'warn' : 'ok'; };
   const deltaClass = (k, d) => { if (d == null || d === 0) return ''; const g = GOOD[k] || 'low'; return (g === 'low') === d < 0 ? 'good' : 'poor'; };
   const SIGNED = { pct: (d) => (d > 0 ? '+' : '') + d.toFixed(1) + ' pt', min: (d) => (d > 0 ? '+' : '') + d.toFixed(1) + ' min', inr: (d) => (Math.round(d) > 0 ? '+' : Math.round(d) < 0 ? '−' : '') + '₹' + inr.format(Math.abs(Math.round(d))), int: (d) => (d > 0 ? '+' : '') + d3.format(',')(Math.round(d)), rating: (d) => (d > 0 ? '+' : '') + d.toFixed(2), hours: (d) => (d > 0 ? '+' : '') + (Math.abs(d) >= 100 ? d3.format(',')(Math.round(d)) : d.toFixed(1)) + ' h', days: (d) => (d > 0 ? '+' : '') + (Number.isInteger(d) ? d : d.toFixed(1)) + ' days', num1: (d) => (d > 0 ? '+' : '') + d.toFixed(1) };
@@ -36,21 +36,22 @@
   /* ---------- calculations (readers can open these in Sources) ---------- */
 
   const dayNum = (s) => Date.UTC(+s.slice(0, 4), +s.slice(5, 7) - 1, +s.slice(8, 10)) / 864e5;
-  const KPI_SUMS = ['orders', 'cancelled', 'cancelled_value', 'kpt_lt5', 'kpt_5_8', 'kpt_8_10', 'kpt_gt10', 'online_hours', 'budget_hours', 'rating_count', 'refund_amt', 'complaint_orders', 'unique_concern', 'multi_concern', 'product_concern', 'service_concern', 'crit_veg', 'crit_foreign', 'crit_pests', 'l1_quality', 'l1_quantity', 'l1_packaging', 'l1_missing', 'l1_wrong'];
+  const KPI_SUMS = ['orders', 'cancelled', 'cancelled_value', 'kpt_lt5', 'kpt_5_8', 'kpt_8_10', 'kpt_10_12', 'kpt_gt12', 'kpt_gt10', 'online_hours', 'budget_hours', 'rating_count', 'refund_amt', 'complaint_orders', 'unique_concern', 'multi_concern', 'product_concern', 'service_concern', 'crit_veg', 'crit_foreign', 'crit_pests', 'l1_quality', 'l1_quantity', 'l1_packaging', 'l1_missing', 'l1_wrong'];
   const KPI_WAVG = ['kpt_avg', 'kpt_peak', 'kpt_offpeak', 'correct_mfr_pct', 'mfr_not_marked_pct', 'handover_avg', 'handover_over3_pct', 'rider_wait_arrival_pct', 'food_wait_mfr_pct', 'food_wait_min', 'tat_avg'];
   let NET_AOV = 0;   // network average cancelled-order value, set when `kpis` is computed
-  const KPI_DELTAS = ['rating', 'rating_n', 'sale_loss', 'refund', 'guest_value', 'cancel_pct', 'completion_pct', 'product_pct', 'service_pct', 'complaints', 'complaint_pct', 'unique_pct', 'multi_pct', 'crit_total', 'kpt', 'kpt_peak', 'kpt_offpeak', 'kpt_gt10_pct', 'vis_pct', 'nonop_days', 'offline_hours', 'offline_per_outlet', 'est_lost_orders', 'est_lost_value', 'mfr_correct_pct', 'mfr_incorrect_pct', 'mfr_not_marked_pct', 'handover', 'handover_dev', 'over3_pct', 'wait_arr_pct', 'food_wait_pct', 'food_wait_min', 'tat', 'orders'];
+  const KPI_DELTAS = ['rating', 'rating_n', 'sale_loss', 'refund', 'guest_value', 'cancel_pct', 'completion_pct', 'product_pct', 'service_pct', 'complaints', 'complaint_pct', 'unique_pct', 'multi_pct', 'crit_total', 'kpt', 'kpt_peak', 'kpt_offpeak', 'kpt_gt10_pct', 'vis_pct', 'nonop_days', 'offline_hours', 'offline_per_outlet', 'est_lost_orders', 'est_lost_value', 'mfr_correct_pct', 'mfr_incorrect_pct', 'mfr_not_marked_pct', 'handover', 'handover_dev', 'over3_pct', 'wait_arr_pct', 'food_wait_pct', 'food_wait_min', 'tat', 'adt', 'ads', 'orders'];
 
   /* Every headline figure for one set of daily rows. Shares are percent of orders; time cuts are orders-weighted. */
   function kpiAgg(rows) {
     const N = (x) => +x || 0, r1 = (v) => Math.round(v * 10) / 10, r2 = (v) => Math.round(v * 100) / 100;
     // non-operational = a day the outlet was planned to open (ideal hours > 0) but was online 0 hours; counted per outlet
-    const s = {}; let nonop = 0, plannedDays = 0, ratingW = 0; const ids = new Set(), planned = new Set(), offline = new Set();
+    const s = {}; let nonop = 0, plannedDays = 0, sellDays = 0, ratingW = 0; const ids = new Set(), planned = new Set(), offline = new Set();
     for (const r of rows) {
       const o = N(r.orders); ids.add(r.restaurant_id);
       for (const k of KPI_SUMS) s[k] = (s[k] || 0) + N(r[k]);
       for (const k of KPI_WAVG) s[k] = (s[k] || 0) + N(r[k]) * o;
       ratingW += N(r.rating_avg) * N(r.rating_count);
+      if (o > 0) sellDays++;
       if (N(r.budget_hours) > 0) { planned.add(r.restaurant_id); plannedDays++; if (N(r.online_hours) === 0) { nonop++; offline.add(r.restaurant_id); } }
     }
     const o = s.orders || 0, pc = (v) => (o ? r1((100 * v) / o) : null), w = (k) => (o ? r1(s[k] / o) : null), ps = (k) => (o ? r1((100 * s[k]) / o) : null);
@@ -72,7 +73,7 @@
       crit_veg_pct: pc2(s.crit_veg || 0), crit_foreign_pct: pc2(s.crit_foreign || 0), crit_pests_pct: pc2(s.crit_pests || 0),
       crit_veg_share: pcrit(s.crit_veg || 0), crit_foreign_share: pcrit(s.crit_foreign || 0), crit_pests_share: pcrit(s.crit_pests || 0),
       kpt: w('kpt_avg'), kpt_peak: w('kpt_peak'), kpt_offpeak: w('kpt_offpeak'),
-      kpt_lt5_pct: pc(s.kpt_lt5 || 0), kpt_5_8_pct: pc(s.kpt_5_8 || 0), kpt_8_10_pct: pc(s.kpt_8_10 || 0), kpt_gt10_pct: pc(s.kpt_gt10 || 0),
+      kpt_lt5_pct: pc(s.kpt_lt5 || 0), kpt_5_8_pct: pc(s.kpt_5_8 || 0), kpt_8_10_pct: pc(s.kpt_8_10 || 0), kpt_10_12_pct: pc(s.kpt_10_12 || 0), kpt_gt12_pct: pc(s.kpt_gt12 || 0), kpt_gt10_pct: pc(s.kpt_gt10 || 0),
       vis_pct: s.budget_hours ? r1((100 * s.online_hours) / s.budget_hours) : null, offline_hours: r1(offHours),
       nonop_days: planned.size ? r1(nonop / planned.size) : null, nonop_outlet_days: nonop, nonop_outlets: offline.size, outlets_planned: planned.size,
       offline_per_outlet: planned.size ? r1(offHours / planned.size) : null, offline_min_day: plannedDays ? Math.round((60 * offHours) / plannedDays) : null,
@@ -80,6 +81,8 @@
       mfr_correct_pct: ps('correct_mfr_pct'), mfr_incorrect_pct: o ? r1(100 - (100 * s.correct_mfr_pct) / o) : null, mfr_not_marked_pct: ps('mfr_not_marked_pct'),
       handover: w('handover_avg'), handover_dev: o ? r1(s.handover_avg / o - 3) : null, over3_pct: ps('handover_over3_pct'), wait_arr_pct: ps('rider_wait_arrival_pct'), food_wait_pct: ps('food_wait_mfr_pct'), food_wait_min: w('food_wait_min'),
       tat: w('tat_avg'),
+      // ADT = delivered orders per outlet per day it sold; ADS = ADT × order value (estimate, same stand-in as lost value)
+      sell_days: sellDays, adt: sellDays ? r1((o - (s.cancelled || 0)) / sellDays) : null, ads: sellDays ? Math.round(((o - (s.cancelled || 0)) / sellDays) * aov) : null,
     };
   }
 
@@ -154,7 +157,7 @@
   const TABS = ['overview', 'leaderboard', 'input', 'output', 'outcome'];
   const state = { l1: null, itemsMode: 'same', lbSort: 'rating', lbOrder: 'worst', open: new Set(), ideal: 18, lbLimit: 50, tab: TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview' };
   let restaurants = [], byId = {};
-  const params = () => { const p = dash.params(); return { brand: p.brand || [], state: p.state || [], city: p.city || [], outlet: p.outlet || [], period: +(p.period || 28), daytype: p.daytype || 'all', from: p.from || '', to: p.to || '' }; };
+  const params = () => { const p = dash.params(); return { brand: p.brand || [], zone: p.zone || [], state: p.state || [], city: p.city || [], outlet: p.outlet || [], period: +(p.period || 28), daytype: p.daytype || 'all', from: p.from || '', to: p.to || '' }; };
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
   /* State of each city in the outlet master (the master has no state column). Delhi and Chandigarh are union territories;
@@ -169,40 +172,51 @@
     'Uttar Pradesh': ['Agra', 'Kanpur', 'Lucknow', 'Noida', 'Noida 1'], Uttarakhand: ['Dehradun'], 'West Bengal': ['Kolkata'],
   };
   const STATE_OF = Object.fromEntries(Object.entries(STATE).flatMap(([s, cities]) => cities.map((c) => [c, s])));
+  /* Region of each state (four zones). Rajasthan is counted North, Madhya Pradesh West. */
+  const REGION = {
+    North: ['Chandigarh', 'Delhi', 'Haryana', 'Punjab', 'Rajasthan', 'Uttar Pradesh', 'Uttarakhand'],
+    South: ['Andhra Pradesh', 'Karnataka', 'Kerala', 'Tamil Nadu', 'Telangana'],
+    East: ['Bihar', 'Jharkhand', 'Odisha', 'West Bengal'],
+    West: ['Gujarat', 'Madhya Pradesh', 'Maharashtra'],
+  };
+  const REGION_OF = Object.fromEntries(Object.entries(REGION).flatMap(([z, states]) => states.map((st) => [st, z])));
 
-  /* Brand / state / city / outlet filters: any picked value within a filter, every filter together; nothing picked = no limit.
-     Brand narrows the state list, brand + state the city list, all three the outlet list ("pool"). One outlet left = outlet view. */
+  /* Brand / region / state / city / outlet filters: any picked value within a filter, every filter together; nothing picked = no limit.
+     Each filter narrows the lists of the ones after it; the last list is the outlet list ("pool"). One outlet left = outlet view. */
   const pick = (vals, v) => !vals.length || vals.includes(v);
   const listLabel = (vals, noun) => (vals.length <= 2 ? vals.join(' + ') : `${vals.length} ${noun}`);
   function scopeInfo(p) {
-    const byBrand = restaurants.filter((r) => pick(p.brand, r.region)), byState = byBrand.filter((r) => pick(p.state, r.state)), poolRows = byState.filter((r) => pick(p.city, r.city));
+    const byBrand = restaurants.filter((r) => pick(p.brand, r.region)), byZone = byBrand.filter((r) => pick(p.zone, r.zone)), byState = byZone.filter((r) => pick(p.state, r.state)), poolRows = byState.filter((r) => pick(p.city, r.city));
     const ids = new Set(poolRows.filter((r) => pick(p.outlet, r.restaurant_id)).map((r) => r.restaurant_id));
-    const any = p.brand.length + p.state.length + p.city.length + p.outlet.length > 0, single = ids.size === 1 ? [...ids][0] : null, o = single && byId[single];
+    const any = p.brand.length + p.zone.length + p.state.length + p.city.length + p.outlet.length > 0, single = ids.size === 1 ? [...ids][0] : null, o = single && byId[single];
     const parts = [];   // picked outlets already imply their brand, state and city, so they name the selection alone
     if (p.outlet.length) parts.push(listLabel(p.outlet.map((id) => (byId[id] ? byId[id].name : id)), 'outlets'));
     else {
       if (p.brand.length) parts.push(listLabel(p.brand, 'brands'));
+      if (p.zone.length && !p.state.length && !p.city.length) parts.push(listLabel(p.zone, 'regions'));
       if (p.state.length && !p.city.length) parts.push(listLabel(p.state, 'states'));   // picked cities already imply their state
       if (p.city.length) parts.push(listLabel(p.city, 'cities'));
     }
     return {
-      byBrand, byState, poolRows, pool: new Set(poolRows.map((r) => r.restaurant_id)), ids, any, single,
+      byBrand, byZone, byState, poolRows, pool: new Set(poolRows.map((r) => r.restaurant_id)), ids, any, single,
       name: !any ? 'Network' : o ? o.name : parts.join(', '),
       label: !any ? 'All outlets' : o ? `${o.name} · ${o.city}` : p.outlet.length ? parts[0] : `${parts.join(' · ')} · ${ids.size} outlets`,
       key: !any ? 'all' : single || 'selection',
-      selKey: JSON.stringify([p.brand, p.state, p.city, p.outlet]),
+      selKey: JSON.stringify([p.brand, p.zone, p.state, p.city, p.outlet]),
     };
   }
   /* set one filter, then drop picks the narrower filters no longer offer */
   function setSel(key, vals) {
     const p = Object.assign(params(), { [key]: vals });
     const byBrand = restaurants.filter((r) => pick(p.brand, r.region));
-    p.state = p.state.filter((s) => byBrand.some((r) => r.state === s));
-    const byState = byBrand.filter((r) => pick(p.state, r.state));
+    p.zone = p.zone.filter((z) => byBrand.some((r) => r.zone === z));
+    const byZone = byBrand.filter((r) => pick(p.zone, r.zone));
+    p.state = p.state.filter((s) => byZone.some((r) => r.state === s));
+    const byState = byZone.filter((r) => pick(p.state, r.state));
     p.city = p.city.filter((c) => byState.some((r) => r.city === c));
     const pool = new Set(byState.filter((r) => pick(p.city, r.city)).map((r) => r.restaurant_id));
     p.outlet = p.outlet.filter((id) => pool.has(id));
-    dash.setParams({ brand: p.brand, state: p.state, city: p.city, outlet: p.outlet });
+    dash.setParams({ brand: p.brand, zone: p.zone, state: p.state, city: p.city, outlet: p.outlet });
   }
 
   /* ---------- tiles ---------- */
@@ -239,7 +253,7 @@
   // Causal chain
   tiles('chain-input-kpis', [
     { label: 'KPT', field: 'kpt', fmt: 'min', big: true }, { label: 'Peak KPT', field: 'kpt_peak', fmt: 'min' }, { label: 'Orders over 10 min', field: 'kpt_gt10_pct', fmt: 'pct' },
-    { label: 'Visibility', field: 'vis_pct', fmt: 'pct' }, { label: 'Correct MFR', field: 'mfr_correct_pct', fmt: 'pct' }, { label: 'Handover', field: 'handover', fmt: 'min' }, { label: 'TAT', field: 'tat', fmt: 'min' },
+    { label: 'Visibility', field: 'vis_pct', fmt: 'pct' }, { label: 'Correct MFR', field: 'mfr_correct_pct', fmt: 'pct' }, { label: 'Handover', field: 'handover', fmt: 'min' }, { label: 'Order → pickup', field: 'tat', fmt: 'min', tip: () => 'Order placed → rider picks up the food' },
   ]);
   tiles('chain-output-kpis', [
     { label: 'Total concerns', field: 'complaint_pct', fmt: 'pct', big: true, tip: () => 'Orders with at least one IGCC complaint ÷ orders' }, { label: 'Total concerns (count)', field: 'complaints', fmt: 'int', nostatus: true, tip: () => 'Orders with at least one IGCC complaint' },
@@ -249,6 +263,7 @@
   ]);
   tiles('chain-outcome-kpis', [
     { label: 'Rating', field: 'rating', fmt: 'rating', big: true, stars: true }, { label: 'Ratings', field: 'rating_n', fmt: 'int', nostatus: true },
+    { label: 'ADT', field: 'adt', fmt: 'num1', nostatus: true, tip: () => 'Average daily transactions: delivered orders per outlet per selling day' }, { label: 'ADS (est.)', field: 'ads', fmt: 'inr', nostatus: true, tip: () => 'Average daily sales per outlet: ADT × average order value (estimate — no sales feed yet)' },
     { label: 'Value to guest', field: 'guest_value', fmt: 'inr', nostatus: true, tip: () => 'Refunds + cancelled order value' },
   ]);
   // Group summaries (compact, no delta)
@@ -259,8 +274,8 @@
     critical: [{ label: 'Incidents', field: 'crit_total', fmt: 'int' }],
     cancel: [{ label: 'Cancelled', field: 'cancel_pct', fmt: 'pct' }, { label: 'Completion', field: 'completion_pct', fmt: 'pct' }],
     refund: [{ label: 'Refunded ₹', field: 'refund', fmt: 'inr', nostatus: true }],
-    tat: [{ label: 'Actual TAT', field: 'tat', fmt: 'min' }],
-    kpt: [{ label: 'KPT', field: 'kpt', fmt: 'min' }, { label: 'Peak', field: 'kpt_peak', fmt: 'min' }, { label: '> 10 min', field: 'kpt_gt10_pct', fmt: 'pct' }],
+    sales: [{ label: 'ADT', field: 'adt', fmt: 'num1', nostatus: true }, { label: 'ADS (est.)', field: 'ads', fmt: 'inr', nostatus: true }],
+    kpt: [{ label: 'KPT', field: 'kpt', fmt: 'min' }, { label: 'Peak', field: 'kpt_peak', fmt: 'min' }, { label: '> 10 min', field: 'kpt_gt10_pct', fmt: 'pct' }, { label: 'Order → pickup', field: 'tat', fmt: 'min' }],
     vis: [{ label: 'Visibility', field: 'vis_pct', fmt: 'pct' }, { label: 'Non-op days / outlet', field: 'nonop_days', fmt: 'days' }],
     mfr: [{ label: 'Correct MFR', field: 'mfr_correct_pct', fmt: 'pct' }, { label: 'Handover', field: 'handover', fmt: 'min' }, { label: 'Food waited', field: 'food_wait_pct', fmt: 'pct' }],
     oos: [{ label: 'OOS cancels', field: 'pct', fmt: 'pct', source: 'cancel_mix', level: 'group', name: 'RDC_OOS', nostatus: true }],
@@ -275,7 +290,8 @@
   tiles('t-concern-count', [{ label: 'Unique concern orders', field: 'unique', fmt: 'int', nostatus: true, delta: false }, { label: 'Unique %', field: 'unique_pct', fmt: 'pct', nostatus: true }, { label: 'Multiple concern orders', field: 'multi', fmt: 'int', nostatus: true, delta: false }, { label: 'Multiple %', field: 'multi_pct', fmt: 'pct' }]);
   tiles('t-cancel', [{ label: 'Cancelled %', field: 'cancel_pct', fmt: 'pct', big: true }, { label: 'Order completion', field: 'completion_pct', fmt: 'pct' }, { label: 'Cancelled orders', field: 'cancelled', fmt: 'int', nostatus: true, delta: false }, { label: 'Top reason', field: 'pct', fmt: 'pct', source: 'cancel_mix', level: 'reason', name: '', nostatus: true, delta: false, top: true }]);
   tiles('t-refund', [{ label: 'Total refunded (IGCC)', field: 'refund', fmt: 'inr', big: true, nostatus: true }, { label: 'Complaint orders', field: 'complaints', fmt: 'int', nostatus: true, delta: false }]);
-  tiles('t-tat', [{ label: 'Actual average TAT', field: 'tat', fmt: 'min', big: true }]);
+  tiles('t-tat', [{ label: 'Average order → pickup', field: 'tat', fmt: 'min', big: true }]);
+  tiles('t-sales', [{ label: 'ADT · orders per outlet a day', field: 'adt', fmt: 'num1', big: true, nostatus: true }, { label: 'ADS (est.) · ₹ per outlet a day', field: 'ads', fmt: 'inr', big: true, nostatus: true }, { label: 'Orders', field: 'orders', fmt: 'int', nostatus: true, delta: false }, { label: 'Selling outlet-days', field: 'sell_days', fmt: 'int', nostatus: true, delta: false }]);
   tiles('t-kpt', [{ label: 'Average KPT', field: 'kpt', fmt: 'min', big: true }, { label: 'Peak hours', field: 'kpt_peak', fmt: 'min' }, { label: 'Off-peak', field: 'kpt_offpeak', fmt: 'min' }, { label: 'Orders over 10 min', field: 'kpt_gt10_pct', fmt: 'pct' }]);
   // tip: one-line explanation shown on hover, built from the row so it carries the live numbers
   const n = (v) => d3.format(',')(Math.round(v || 0));
@@ -301,22 +317,22 @@
     rating: [['Product-wise rating', 'Swiggy rating feed has no item column']],
     saleloss: [['Sale loss %', 'Total GMV not in DB (payout file)']],
     guestvalue: [['Value to guest % of sales', 'Needs GMV from the payout file']],
-    concerns: [['Top items by menu category', 'Partial: needs item → menu-category master; rows without a category show as Uncategorised']],
+    concerns: [['Top items by menu category', 'Partial: needs item → menu-category master; rows without a category show as Uncategorised'], ['Complaint resolution TAT (open / close / no response)', 'No complaint-resolution timestamps in IGCC']],
     critical: [['Multiple critical per order', 'Needs order-level complaint rows'], ['Items by menu category', 'Needs item master']],
     cancel: [['Cancelled before / after MFR', 'Cancelled orders have no timestamp row'], ['Avg cancellation time per reason', 'RDC has date only, no cancellation timestamp']],
     refund: [['Refund greater than bill', 'IGCC has no order / bill value'], ['Net refund', 'Depends on the row above']],
-    tat: [['Open / Close / No response', 'No complaint-resolution timestamps in IGCC'], ['Order → delivered', 'Delivered time exists only for complaint orders']],
-    kpt: [['Items sold by KPT bucket', 'No item lines for completed orders'], ['Items per order', 'No item lines for completed orders']],
+    sales: [['Actual ADS', 'Needs the sales value of delivered orders (payout file)']],
+    kpt: [['Items sold by KPT bucket', 'No item lines for completed orders'], ['Items per order', 'No item lines for completed orders'], ['Order → delivered', 'Delivered time exists only for complaint orders']],
     vis: [['Live status of offline restaurant', 'Feed is daily, not real-time'], ['Hourly / peak / day-part visibility', 'Daily feed']],
     mfr: [['Order type (Instant, Std, Train, Bulk…)', 'No order-type column in the Swiggy feeds']],
     oos: [['Product type stock-up %', 'Swiggy OOS report TBD'], ['Stock-out duration', 'OOS report not loaded'], ['Source closure %', 'OOS report not loaded'], ['Status type %', 'OOS report not loaded'], ['Discounted product OOS %', 'OOS report not loaded'], ['OOS vs minimum closing balance', 'OOS report not loaded']],
   };
-  const AVAIL = { rating: [1, 2], saleloss: [2, 3], guestvalue: [1, 2], concerns: [14, 15], critical: [9, 11], cancel: [6, 8], refund: [2, 4], tat: [3, 5], kpt: [7, 9], vis: [3, 5], mfr: [8, 9], oos: [0, 6] };
+  const AVAIL = { rating: [1, 2], saleloss: [2, 3], guestvalue: [1, 2], concerns: [14, 16], critical: [9, 11], cancel: [6, 8], refund: [2, 4], sales: [1, 2], kpt: [10, 13], vis: [3, 5], mfr: [8, 9], oos: [0, 6] };
   Object.entries(NA).forEach(([g, list]) => { $('na-' + g).innerHTML = '<b>Not yet available</b>' + list.map(([l, note]) => `<span title="${note}">${l}<i> · ${note}</i></span>`).join(''); });
   Object.entries(AVAIL).forEach(([g, [a, b]]) => { $('avail-' + g).textContent = `${a} of ${b} sub-metrics`; });
 
   /* ---------- controls ---------- */
-  const setDefaults = () => dash.setParams({ brand: [], state: [], city: [], outlet: [], period: 28, daytype: 'all', from: '', to: '' });
+  const setDefaults = () => dash.setParams({ brand: [], zone: [], state: [], city: [], outlet: [], period: 28, daytype: 'all', from: '', to: '' });
 
   /* checkbox drop-down for one filter; returns update(options [{v, l, sub}], selected) */
   const CHEV = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
@@ -349,6 +365,7 @@
     };
   }
   const msBrand = multiSelect('f-brand', 'brand', { title: 'Brand', noun: 'brands' });
+  const msZone = multiSelect('f-zone', 'zone', { title: 'Region', noun: 'regions' });
   const msState = multiSelect('f-state', 'state', { title: 'State', noun: 'states', search: true });
   const msCity = multiSelect('f-city', 'city', { title: 'City', noun: 'cities', search: true });
   const msOutlet = multiSelect('f-outlet', 'outlet', { title: 'Outlet', noun: 'outlets', search: true });
@@ -424,9 +441,10 @@
       const e = byDay.get(d) || { d, o: 0, s: {} };
       const o = N(r.orders); e.o += o;
       for (const k of ['kpt_avg', 'kpt_peak', 'kpt_offpeak', 'correct_mfr_pct', 'handover_avg', 'handover_over3_pct', 'food_wait_mfr_pct', 'tat_avg']) e.s[k] = (e.s[k] || 0) + N(r[k]) * o;
-      for (const k of ['cancelled', 'cancelled_value', 'refund_amt', 'product_concern', 'service_concern', 'online_hours', 'budget_hours', 'crit_veg', 'crit_foreign', 'crit_pests', 'kpt_lt5', 'kpt_5_8', 'kpt_8_10', 'kpt_gt10', 'rating_count']) e.s[k] = (e.s[k] || 0) + N(r[k]);
+      for (const k of ['cancelled', 'cancelled_value', 'refund_amt', 'product_concern', 'service_concern', 'online_hours', 'budget_hours', 'crit_veg', 'crit_foreign', 'crit_pests', 'kpt_lt5', 'kpt_5_8', 'kpt_8_10', 'kpt_10_12', 'kpt_gt12', 'kpt_gt10', 'rating_count']) e.s[k] = (e.s[k] || 0) + N(r[k]);
       e.s.rating_w = (e.s.rating_w || 0) + N(r.rating_avg) * N(r.rating_count);
       e.s.planned = (e.s.planned || 0) + (N(r.budget_hours) > 0 ? 1 : 0);   // outlets due to open that day
+      e.s.selling = (e.s.selling || 0) + (o > 0 ? 1 : 0);                   // outlets with orders that day
       byDay.set(d, e);
     }
     const list = [...byDay.values()].sort((a, b) => a.d - b.d);
@@ -436,7 +454,7 @@
       const e = list[i]; if (e.d < start) continue;
       const win = list.filter((x) => x.d > e.d - rolling && x.d <= e.d);
       const o = d3.sum(win, (x) => x.o), S = (k) => d3.sum(win, (x) => x.s[k] || 0);
-      out.push({ d: toDate(e.d), o: e.o, day: e, w: (k) => (o ? S(k) / o : null), pct: (k) => (o ? (100 * S(k)) / o : null), rating: S('rating_count') ? S('rating_w') / S('rating_count') : null });
+      out.push({ d: toDate(e.d), o: e.o, day: e, w: (k) => (o ? S(k) / o : null), pct: (k) => (o ? (100 * S(k)) / o : null), rating: S('rating_count') ? S('rating_w') / S('rating_count') : null, adt: S('selling') ? (o - S('cancelled')) / S('selling') : null });
     }
     return out;
   }
@@ -469,13 +487,14 @@
     document.querySelectorAll('[role=tabpanel][data-tab]').forEach((s) => { s.hidden = s.dataset.tab !== state.tab; });
 
     restaurants = rows('restaurants'); byId = Object.fromEntries(restaurants.map((r) => [r.restaurant_id, r]));
-    restaurants.forEach((r) => { if (!r.state) r.state = STATE_OF[r.city] || 'Other'; });
+    restaurants.forEach((r) => { if (!r.state) r.state = STATE_OF[r.city] || 'Other'; if (!r.zone) r.zone = REGION_OF[r.state] || 'Other'; });
     const info = scopeInfo(p);
     p.scope = info.key;   // 'all' | outlet id | 'selection' — labels the data-where links
     // brand / city / outlet filters
     if (restaurants.length) {
       msBrand([...new Set(restaurants.map((r) => r.region))].sort().map((v) => ({ v, l: v })), p.brand);
-      msState([...new Set(info.byBrand.map((r) => r.state))].sort().map((v) => ({ v, l: v })), p.state);
+      msZone([...new Set(info.byBrand.map((r) => r.zone))].sort().map((v) => ({ v, l: v })), p.zone);
+      msState([...new Set(info.byZone.map((r) => r.state))].sort().map((v) => ({ v, l: v })), p.state);
       msCity([...new Set(info.byState.map((r) => r.city))].sort().map((v) => ({ v, l: v, sub: p.state.length === 1 ? '' : STATE_OF[v] })), p.city);
       msOutlet([...info.poolRows].sort((a, b) => a.city.localeCompare(b.city) || a.name.localeCompare(b.name)).map((r) => ({ v: r.restaurant_id, l: r.name, sub: r.city })), p.outlet);
     }
@@ -515,10 +534,11 @@
     const name = info.name;
     const W = weekly(daily, ids, p, end);
     const vis = (id) => { const el = $(id); if (!el) return false; const g = el.closest('.grp'); if (g && g.dataset.open !== '1') return false; return el.clientWidth > 0; };
-    const pair = (key, kind) => { const ser = [{ name, color: dash.colors[0], points: S.map((x) => ({ d: x.d, v: kind === 'w' ? x.w(key) : kind === 'pct' ? x.pct(key) : x.rating })) }]; if (!isNet) ser.push({ name: 'Network', muted: true, points: SN.map((x) => ({ d: x.d, v: kind === 'w' ? x.w(key) : kind === 'pct' ? x.pct(key) : x.rating })) }); return ser; };
+    const pair = (key, kind) => { const val = (x) => (kind === 'w' ? x.w(key) : kind === 'pct' ? x.pct(key) : x[kind]); const ser = [{ name, color: dash.colors[0], points: S.map((x) => ({ d: x.d, v: val(x) })) }]; if (!isNet) ser.push({ name: 'Network', muted: true, points: SN.map((x) => ({ d: x.d, v: val(x) })) }); return ser; };
     const weekendDays = S.filter((x) => x.d.getUTCDay() === 0 || x.d.getUTCDay() === 6).map((x) => x.d);
 
-    // ---- Outcome: rating, value to guest · Output: sale loss per day
+    // ---- Outcome: rating, daily sales, value to guest · Output: sale loss per day
+    if (vis('c-adt-line')) C.line($('c-adt-line'), pair('adt', 'adt'), { fmt: F.num1, y0: true });
     if (vis('c-rating-line')) C.line($('c-rating-line'), pair('rating', 'rating'), { fmt: F.rating, h: 200, ref: { v: 4.3, label: 'target 4.30' } });
     if (vis('c-saleloss-line')) C.line($('c-saleloss-line'), [{ name: 'Cancelled ₹', color: dash.colors[0], points: S.map((x) => ({ d: x.d, v: x.day.s.cancelled_value || 0 })) }], { fmt: F.inr, y0: true, area: true, endLabels: false });
     if (vis('c-guestvalue-weekly')) C.stackedWeekly($('c-guestvalue-weekly'), W.map((w) => ({ d: w.d, parts: { refund: w.s.refund_amt, cancelled: w.s.cancelled_value } })), [{ key: 'refund', label: 'Refunds ₹', color: dash.colors[0] }, { key: 'cancelled', label: 'Cancelled value ₹', color: dash.colors[1] }]);
@@ -570,7 +590,7 @@
     if (vis('c-refund-reasons')) { const L1C = Object.fromEntries(L1.map(([k], i) => [k, dash.colors[i]])); const m = d3.rollups(comp, (v) => d3.sum(v, (r) => N(r.refund_amt)), (r) => r.l1 + '|' + r.l2).sort((a, b) => b[1] - a[1]).slice(0, 10); C.ranked($('c-refund-reasons'), m.map(([k, v]) => { const [l1, l2] = k.split('|'); return { label: l2, value: v, sub: L1.find((x) => x[0] === l1)[1], color: L1C[l1] }; }), { fmt: F.inr }); }
     if (vis('c-refund-line')) C.line($('c-refund-line'), [{ name: 'Refund ₹', color: dash.colors[0], points: S.map((x) => ({ d: x.d, v: x.day.s.refund_amt || 0 })) }], { fmt: F.inr, y0: true, area: true, endLabels: false });
 
-    // ---- Input: TAT
+    // ---- Input: order → pickup time
     if (vis('c-tat-line')) C.line($('c-tat-line'), pair('tat_avg', 'w'), { fmt: F.min, ref: { v: state.ideal, label: `ideal ${state.ideal} min` } });
     const varEl = $('ideal-tat').parentElement.querySelector('span'); if (row && row.tat != null) varEl.textContent = `— variance ${(row.tat - state.ideal > 0 ? '+' : '') + (row.tat - state.ideal).toFixed(1)} min vs ideal (ideal not defined in the sheet; set it here).`;
 
@@ -578,9 +598,9 @@
     const parts = (f) => [['breakfast', 'Breakfast'], ['lunch', 'Lunch'], ['snacks', 'Snacks'], ['dinner', 'Dinner'], ['late', 'Late night'], ['peak', 'Peak hrs'], ['offpeak', 'Off-peak']].map(([k, l]) => { const r = hc.find((x) => x.daytype === p.daytype && x.part === k); return { label: l, v: r ? r[f] : null, n: r ? r.orders : 0, key: k }; });
     if (vis('c-kpt-parts')) C.parts($('c-kpt-parts'), parts('kpt').filter((x) => x.key !== 'breakfast'), { fmt: F.num1, color: (x) => (x.key === 'peak' ? dash.colors[3] : x.key === 'offpeak' ? dash.colors[2] : dash.colors[0]) });
     if (vis('c-kpt-peak')) C.line($('c-kpt-peak'), [{ name: 'Peak', color: dash.colors[3], points: S.map((x) => ({ d: x.d, v: x.w('kpt_peak') })) }, { name: 'Off-peak', color: dash.colors[2], points: S.map((x) => ({ d: x.d, v: x.w('kpt_offpeak') })) }], { fmt: F.min });
-    const BK = [{ key: 'b0', label: '< 5', color: dash.colors[2] }, { key: 'b1', label: '5–8', color: dash.colors[0] }, { key: 'b2', label: '8–10', color: dash.colors[1] }, { key: 'b3', label: '> 10', color: dash.colors[3] }];
-    if (vis('c-kpt-bucket') && row) { const g = [{ label: name, parts: [{ key: 'b0', value: row.kpt_lt5_pct || 0 }, { key: 'b1', value: row.kpt_5_8_pct || 0 }, { key: 'b2', value: row.kpt_8_10_pct || 0 }, { key: 'b3', value: row.kpt_gt10_pct || 0 }] }]; if (!isNet && net) g.push({ label: 'Network', parts: [{ key: 'b0', value: net.kpt_lt5_pct || 0 }, { key: 'b1', value: net.kpt_5_8_pct || 0 }, { key: 'b2', value: net.kpt_8_10_pct || 0 }, { key: 'b3', value: net.kpt_gt10_pct || 0 }] }); C.stackedH($('c-kpt-bucket'), g, BK); }
-    if (vis('c-kpt-weekly')) C.stackedWeekly($('c-kpt-weekly'), W.map((w) => ({ d: w.d, parts: { b0: w.s.kpt_lt5, b1: w.s.kpt_5_8, b2: w.s.kpt_8_10, b3: w.s.kpt_gt10 } })), BK, { share: true, h: 150 });
+    const BK = [{ key: 'b0', label: '< 5', color: dash.colors[2] }, { key: 'b1', label: '5–8', color: dash.colors[0] }, { key: 'b2', label: '8–10', color: dash.colors[1] }, { key: 'b3', label: '10–12', color: dash.colors[5] }, { key: 'b4', label: '12+', color: dash.colors[3] }];
+    if (vis('c-kpt-bucket') && row) { const g = [{ label: name, parts: [{ key: 'b0', value: row.kpt_lt5_pct || 0 }, { key: 'b1', value: row.kpt_5_8_pct || 0 }, { key: 'b2', value: row.kpt_8_10_pct || 0 }, { key: 'b3', value: row.kpt_10_12_pct || 0 }, { key: 'b4', value: row.kpt_gt12_pct || 0 }] }]; if (!isNet && net) g.push({ label: 'Network', parts: [{ key: 'b0', value: net.kpt_lt5_pct || 0 }, { key: 'b1', value: net.kpt_5_8_pct || 0 }, { key: 'b2', value: net.kpt_8_10_pct || 0 }, { key: 'b3', value: net.kpt_10_12_pct || 0 }, { key: 'b4', value: net.kpt_gt12_pct || 0 }] }); C.stackedH($('c-kpt-bucket'), g, BK); }
+    if (vis('c-kpt-weekly')) C.stackedWeekly($('c-kpt-weekly'), W.map((w) => ({ d: w.d, parts: { b0: w.s.kpt_lt5, b1: w.s.kpt_5_8, b2: w.s.kpt_8_10, b3: w.s.kpt_10_12, b4: w.s.kpt_gt12 } })), BK, { share: true, h: 150 });
 
     // ---- Input: visibility
     // hours per outlet that was due to open that day (not per outlet in the selection, which dilutes it)
@@ -600,9 +620,9 @@
 
   /* ---------- leaderboard ---------- */
   const LBT = {
-    outcome: [['rating', 'Rating', 'rating'], ['rating_n', '# ratings', 'int'], ['guest_value', 'Value to guest ₹', 'inr']],
+    outcome: [['rating', 'Rating', 'rating'], ['adt', 'ADT', 'num1'], ['ads', 'ADS (est.)', 'inr'], ['rating_n', '# ratings', 'int'], ['guest_value', 'Value to guest ₹', 'inr']],
     output: [['complaint_pct', 'Total concerns', 'pct'], ['product_pct', 'Product concern', 'pct'], ['service_pct', 'Service concern', 'pct'], ['crit_total', 'Critical incidents', 'int'], ['cancel_pct', 'Cancelled', 'pct'], ['sale_loss', 'Sale loss (cancelled ₹)', 'inr'], ['refund', 'Refunds ₹', 'inr']],
-    input: [['kpt', 'KPT', 'min'], ['kpt_peak', 'Peak KPT', 'min'], ['kpt_gt10_pct', 'Orders > 10 min', 'pct'], ['vis_pct', 'Visibility', 'pct'], ['mfr_correct_pct', 'Correct MFR', 'pct'], ['handover', 'Handover', 'min'], ['food_wait_pct', 'Food waited after MFR', 'pct'], ['tat', 'TAT', 'min']],
+    input: [['kpt', 'KPT', 'min'], ['kpt_peak', 'Peak KPT', 'min'], ['kpt_gt10_pct', 'Orders > 10 min', 'pct'], ['vis_pct', 'Visibility', 'pct'], ['mfr_correct_pct', 'Correct MFR', 'pct'], ['handover', 'Handover', 'min'], ['food_wait_pct', 'Food waited after MFR', 'pct'], ['tat', 'Order → pickup', 'min']],
   };
   // counts and ₹ are network totals, not a typical outlet, so these rows show the outlet's value without a network comparison
   const NO_NET = new Set(['rating_n', 'sale_loss', 'refund', 'guest_value', 'crit_total']);
@@ -610,7 +630,7 @@
   function drawLeaderboard(p, info, kp, net) {
     const box = $('lb-rows');
     // one outlet picked: list its brand / city peers so the row stays in context
-    const ids = info.single ? info.pool : info.ids, brandCity = p.brand.length + p.state.length + p.city.length > 0;
+    const ids = info.single ? info.pool : info.ids, brandCity = p.brand.length + p.zone.length + p.state.length + p.city.length > 0;
     let list = kp.filter((r) => ids.has(r.scope) && +r.period === p.period && r.daytype === p.daytype);
     const k = state.lbSort, dir = (GOOD[k] === 'low' ? 1 : -1) * (state.lbOrder === 'worst' ? -1 : 1);
     list.sort((a, b) => ((a[k] == null) - (b[k] == null)) || dir * (a[k] - b[k]));

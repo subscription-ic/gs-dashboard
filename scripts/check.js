@@ -5,7 +5,7 @@ const queries = require('../src/queries');
 
 const EXPECTED = {
   restaurants: ['restaurant_id', 'name', 'city', 'region'],
-  daily: ['restaurant_id', 'day', 'weekday', 'is_weekend', 'orders', 'cancelled', 'cancelled_value', 'kpt_avg', 'kpt_lt5', 'kpt_5_8', 'kpt_8_10', 'kpt_gt10', 'kpt_peak', 'kpt_offpeak', 'online_hours', 'budget_hours', 'correct_mfr_pct', 'mfr_not_marked_pct', 'handover_avg', 'handover_over3_pct', 'rider_wait_arrival_pct', 'food_wait_mfr_pct', 'food_wait_min', 'tat_avg', 'rating_avg', 'rating_count', 'refund_amt', 'complaint_orders', 'unique_concern', 'multi_concern', 'product_concern', 'service_concern', 'crit_veg', 'crit_foreign', 'crit_pests', 'l1_quality', 'l1_quantity', 'l1_packaging', 'l1_missing', 'l1_wrong'],
+  daily: ['restaurant_id', 'day', 'weekday', 'is_weekend', 'orders', 'cancelled', 'cancelled_value', 'kpt_avg', 'kpt_lt5', 'kpt_5_8', 'kpt_8_10', 'kpt_10_12', 'kpt_gt12', 'kpt_gt10', 'kpt_peak', 'kpt_offpeak', 'online_hours', 'budget_hours', 'correct_mfr_pct', 'mfr_not_marked_pct', 'handover_avg', 'handover_over3_pct', 'rider_wait_arrival_pct', 'food_wait_mfr_pct', 'food_wait_min', 'tat_avg', 'rating_avg', 'rating_count', 'refund_amt', 'complaint_orders', 'unique_concern', 'multi_concern', 'product_concern', 'service_concern', 'crit_veg', 'crit_foreign', 'crit_pests', 'l1_quality', 'l1_quantity', 'l1_packaging', 'l1_missing', 'l1_wrong'],
   hourly: ['restaurant_id', 'weekday', 'hour', 'orders', 'kpt_avg', 'correct_mfr_pct', 'handover_avg', 'mfr_not_marked_pct'],
   complaints: ['restaurant_id', 'week', 'l1', 'l2', 'orders', 'refund_amt', 'critical_type'],
   cancellations: ['restaurant_id', 'week', 'reason', 'cancel_group', 'orders', 'value'],
