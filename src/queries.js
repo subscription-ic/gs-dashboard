@@ -12,7 +12,8 @@ module.exports = {
     sql: `SELECT restaurant_id, CONVERT(varchar(10), [day], 23) AS [day], weekday, is_weekend, orders, cancelled, cancelled_value,
             kpt_avg, kpt_lt5, kpt_5_8, kpt_8_10, kpt_10_12, kpt_gt12, kpt_gt10, kpt_peak, kpt_offpeak,
             online_hours, budget_hours, correct_mfr_pct, mfr_not_marked_pct, handover_avg,
-            handover_over3_pct, rider_wait_arrival_pct, food_wait_mfr_pct, food_wait_min, tat_avg,
+            handover_over3_pct, rider_wait_arrival_pct, rider_wait_min, food_wait_mfr_pct, food_wait_min, tat_avg,
+            dp_breakfast, dp_lunch, dp_snacks, dp_dinner, dp_late,
             rating_avg, rating_count, refund_amt, complaint_orders, unique_concern, multi_concern, product_concern, service_concern,
             crit_veg, crit_foreign, crit_pests, l1_quality, l1_quantity, l1_packaging, l1_missing, l1_wrong
           FROM ${S}.vw_ops_daily ORDER BY restaurant_id, [day]`,

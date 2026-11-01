@@ -275,7 +275,7 @@
     svg.append('circle').attr('cx', x(v)).attr('cy', 7).attr('r', 4.5).attr('fill', worse ? 'var(--cds-chart-status-critical)' : 'var(--color-ok)');
   };
 
-  /* Day-part strip: parts [{label, v, n}] small columns with value labels */
+  /* Day-part strip: parts [{label, v, n}] small columns with value labels; opts.unit names n in the tooltip */
   C.parts = function (el, parts, opts = {}) {
     const h = 86; const { svg, w } = svgIn(el, h);
     const fmt = opts.fmt || d3.format('.1f');
@@ -286,7 +286,7 @@
     const t = tip(el);
     const g = svg.selectAll('g').data(parts).join('g');
     g.append('rect').attr('x', (p) => x(p.label)).attr('y', (p) => (p.v == null ? y(0) : y(p.v))).attr('width', x.bandwidth()).attr('height', (p) => (p.v == null ? 0 : Math.max(0, y(0) - y(p.v)))).attr('rx', 4).attr('fill', (p) => (opts.color ? opts.color(p) : dash.colors[0]))
-      .on('mousemove', (ev, p) => { const [mx, my] = d3.pointer(ev, svg.node()); t.innerHTML = `<div class="ops-tip-h">${p.label}</div><div><b>${fmt(p.v)}</b> · ${d3.format(',')(p.n)} orders</div>`; placeTip(el, t, mx, my); }).on('mouseleave', () => { t.hidden = true; });
+      .on('mousemove', (ev, p) => { const [mx, my] = d3.pointer(ev, svg.node()); t.innerHTML = `<div class="ops-tip-h">${p.label}</div><div><b>${fmt(p.v)}</b> · ${d3.format(',')(p.n)} ${opts.unit || 'orders'}</div>`; placeTip(el, t, mx, my); }).on('mouseleave', () => { t.hidden = true; });
     g.append('text').attr('x', (p) => x(p.label) + x.bandwidth() / 2).attr('y', (p) => (p.v == null ? y(0) : y(p.v)) - 4).attr('text-anchor', 'middle').attr('font-size', 11).attr('fill', 'var(--color-fg)').text((p) => (p.v == null ? '—' : fmt(p.v)));
     g.append('text').attr('x', (p) => x(p.label) + x.bandwidth() / 2).attr('y', h - 5).attr('text-anchor', 'middle').attr('font-size', 10).attr('fill', 'var(--color-fg-muted)').text((p) => p.label);
   };

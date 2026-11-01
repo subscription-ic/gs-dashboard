@@ -300,3 +300,10 @@
 .lb-stat .dv { align-self: flex-start; font-size: var(--cds-font-size-caption); font-weight: 700; padding: 0 6px; border-radius: 999px; background: var(--color-bg); color: var(--color-fg-muted); }
 .lb-stat .dv.good { background: var(--color-ok-soft); color: var(--color-ok); }
 .lb-stat .dv.poor { background: var(--color-bad-soft); color: var(--color-bad); }
+
+/* Store / Aggregator tags, and the aggregator banner: rider-side measures kept apart from the store's own */
+.ops-tag { font-style: normal; font-size: 0.68rem; font-weight: 600; padding: 1px 6px; border-radius: 999px; margin-left: 4px; vertical-align: 1px; }
+.ops-tag.store { background: var(--color-bad-soft); color: var(--color-bad); }
+.ops-tag.aggregator { background: #e2e8f0; color: #334155; }
+.grp.agg { border-left: 4px solid var(--cds-chart-8); background: #f8fafc; }
+.grp.agg .grp-name { color: #334155; }

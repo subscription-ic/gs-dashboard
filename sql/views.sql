@@ -19,8 +19,12 @@
      Correct MFR    = fact_mfr_daily.correct_mfr_pct_swiggy; where Swiggy has no figure, share of orders marked
                       ready before rider arrival (also the hourly cut, which Swiggy doesn't report)
      Not marked     = fact_orders.mfr_not_marked
-     Handover       = fact_orders.handover_min (rider arrival → pickup); rider waited = handover_over_3min
-     Food waited    = fact_orders.mfr_before_arrival; minutes = food_wait_min on those orders
+     Handover       = fact_orders.handover_min (rider arrival → pickup); over 3 min = handover_over_3min
+     Who waits      = every order with both timestamps is one of two cases:
+                      rider waited for food (store side)   = mfr_at > rider_arrived_at; minutes = mfr_at − rider_arrived_at
+                      food waited for rider (aggregator)   = mfr_before_arrival;       minutes = rider_arrived_at − mfr_at
+                      (fact_orders.food_wait_min is MFR → pickup, so it includes the handover; not used)
+     Day parts      = fact_orders.day_part (Breakfast 6–10, Lunch 11–14, Snacks 15–18, Dinner 19–22, Late night 23–5)
      TAT            = fact_orders.order_to_pickup_min
      Visibility     = actual_open_hrs ÷ ideal_open_hrs
      Rating         = average of fact_ratings.rating per outlet-day, with its count
@@ -58,7 +62,13 @@ SELECT
        THEN CAST(o.mfr_before_arrival AS int) END                                AS mfr_before_arrival,
   o.handover_min,
   CASE WHEN o.handover_min IS NOT NULL THEN CAST(o.handover_over_3min AS int) END AS handover_over3,
-  CASE WHEN o.mfr_before_arrival = 1 THEN o.food_wait_min END                    AS food_wait_min,
+  CASE WHEN o.mfr_at IS NOT NULL AND o.rider_arrived_at IS NOT NULL
+       THEN CASE WHEN o.mfr_at > o.rider_arrived_at THEN 1 ELSE 0 END END       AS rider_waited,
+  CASE WHEN o.mfr_at > o.rider_arrived_at
+       THEN DATEDIFF(SECOND, o.rider_arrived_at, o.mfr_at) / 60.0 END            AS rider_wait_min,
+  CASE WHEN o.mfr_before_arrival = 1 AND o.mfr_at IS NOT NULL AND o.rider_arrived_at IS NOT NULL
+       THEN DATEDIFF(SECOND, o.mfr_at, o.rider_arrived_at) / 60.0 END            AS food_wait_min,
+  o.day_part,
   o.order_to_pickup_min                                                          AS tat_min,
   CAST(o.is_peak_hour AS int)                                                    AS is_peak
 FROM dbo.fact_orders o
@@ -120,6 +130,13 @@ ord AS (
     AVG(CASE WHEN is_cancelled = 0 THEN CAST(handover_over3 AS float) END)       AS handover_over3_pct,
     AVG(CASE WHEN is_cancelled = 0 THEN CAST(mfr_before_arrival AS float) END)   AS food_wait_mfr_pct,
     AVG(CASE WHEN is_cancelled = 0 THEN food_wait_min END)                       AS food_wait_min,
+    AVG(CASE WHEN is_cancelled = 0 THEN CAST(rider_waited AS float) END)         AS rider_wait_arrival_pct,
+    AVG(CASE WHEN is_cancelled = 0 THEN rider_wait_min END)                      AS rider_wait_min,
+    SUM(CASE WHEN day_part = 'Breakfast'  THEN 1 ELSE 0 END)                     AS dp_breakfast,
+    SUM(CASE WHEN day_part = 'Lunch'      THEN 1 ELSE 0 END)                     AS dp_lunch,
+    SUM(CASE WHEN day_part = 'Snacks'     THEN 1 ELSE 0 END)                     AS dp_snacks,
+    SUM(CASE WHEN day_part = 'Dinner'     THEN 1 ELSE 0 END)                     AS dp_dinner,
+    SUM(CASE WHEN day_part = 'Late night' THEN 1 ELSE 0 END)                     AS dp_late,
     AVG(CASE WHEN is_cancelled = 0 THEN tat_min END)                             AS tat_avg
   FROM dbo.vw_ops_order_measures GROUP BY restaurant_id, [day]
 ),
@@ -162,8 +179,10 @@ SELECT
   o.kpt_peak, o.kpt_offpeak,
   ISNULL(a.actual_open_hrs, 0) AS online_hours, ISNULL(a.ideal_open_hrs, 0) AS budget_hours,
   COALESCE(m.correct_mfr_pct_swiggy, o.correct_mfr_proxy)                                AS correct_mfr_pct,   -- 0–1
-  o.mfr_not_marked_pct, o.handover_avg, o.handover_over3_pct, o.handover_over3_pct AS rider_wait_arrival_pct,
+  o.mfr_not_marked_pct, o.handover_avg, o.handover_over3_pct, o.rider_wait_arrival_pct, o.rider_wait_min,
   o.food_wait_mfr_pct, o.food_wait_min, o.tat_avg,
+  ISNULL(o.dp_breakfast, 0) AS dp_breakfast, ISNULL(o.dp_lunch, 0) AS dp_lunch, ISNULL(o.dp_snacks, 0) AS dp_snacks,
+  ISNULL(o.dp_dinner, 0) AS dp_dinner, ISNULL(o.dp_late, 0) AS dp_late,
   r.rating_avg, ISNULL(r.rating_count, 0) AS rating_count,
   ISNULL(p.refund_amt, 0) AS refund_amt, ISNULL(p.complaint_orders, 0) AS complaint_orders,
   ISNULL(p.unique_concern, 0) AS unique_concern, ISNULL(p.multi_concern, 0) AS multi_concern,

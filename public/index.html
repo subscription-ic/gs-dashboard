@@ -110,6 +110,8 @@
           <div class="ops-card"><h3>Visibility</h3><div class="ops-tiles" id="t-vis"></div><p class="ops-note">Non-op day = a day the outlet was planned to open but was online 0 hours, averaged per outlet. Lost orders ≈ offline hours × orders per online hour; lost value uses the average cancelled-order value as a stand-in for order value (the network's when there are under 20 cancellations). Both are estimates (the feed is daily).</p></div>
           <div class="ops-card"><h3>Online vs planned hours <span class="n">per open outlet · weekends shaded</span></h3><div class="ops-chart" id="c-vis-line" data-source="daily"></div></div>
           <div class="ops-card"><h3>Estimated lost orders per week</h3><div class="ops-chart" id="c-vis-weekly" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Stores online per day <span class="n">online vs planned to open</span></h3><div class="ops-chart" id="c-vis-stores" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Stores taking orders by day part <span class="n">% of stores online that day · average per day</span></h3><div class="ops-chart short" id="c-vis-parts" data-source="daily"></div><p class="ops-note">The availability feed is daily, so a store counts as live in a day part when it received at least one order in it.</p></div>
         </div>
         <div class="ops-na" id="na-vis"></div>
       </div>
@@ -125,9 +127,21 @@
           <div class="ops-card"><h3>Handover <span class="n">rider arrival → pickup · ideal 3 min</span></h3><div class="ops-tiles" id="t-handover"></div></div>
           <div class="ops-card"><h3>Handover by day part <span class="n">full period · minutes</span></h3><div class="ops-chart short" id="c-ho-parts" data-source="hourly"></div></div>
           <div class="ops-card"><h3>Handover minutes per day <span class="n">7-day rolling · 3-min reference</span></h3><div class="ops-chart" id="c-ho-line" data-source="daily"></div></div>
-          <div class="ops-card wide"><h3>Who waits for whom <span class="n">share of orders · 7-day rolling</span></h3><div class="ops-chart" id="c-wait-line" data-source="daily"></div></div>
+          <div class="ops-card wide"><h3>Who waits for whom <span class="n">store delay vs aggregator delay · share of orders · 7-day rolling</span></h3><div class="ops-tiles" id="t-whowaits"></div><div class="ops-chart" id="c-wait-line" data-source="daily"></div><p class="ops-note">Every order is one or the other: the rider arrived before the food was marked ready (store late), or the food was ready before the rider arrived (rider late).</p></div>
         </div>
         <div class="ops-na" id="na-mfr"></div>
+      </div>
+    </div>
+
+    <div class="grp agg" id="grp-agg" data-open="0">
+      <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">Aggregator performance<small>Rider side · not controlled by the store</small></span><span class="grp-sum" id="sum-agg"></span><span class="grp-avail" id="avail-agg"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
+      <div class="grp-body">
+        <div class="ops-grid">
+          <div class="ops-card"><h3>Food waiting for rider <span class="n">food ready → rider arrives</span></h3><div class="ops-tiles" id="t-agg"></div><p class="ops-note">Food was marked ready before the rider reached the store. Good for the store, but the rider was late.</p></div>
+          <div class="ops-card"><h3>Orders where food waited for rider <span class="n">7-day rolling vs network</span></h3><div class="ops-chart" id="c-agg-line" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Minutes food waited for rider <span class="n">7-day rolling vs network</span></h3><div class="ops-chart" id="c-agg-min" data-source="daily"></div></div>
+        </div>
+        <div class="ops-na" id="na-agg"></div>
       </div>
     </div>
 
