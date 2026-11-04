@@ -117,7 +117,6 @@
 .ops-board-head { display: flex; align-items: center; gap: var(--cds-gap-md); flex-wrap: wrap; }
 .ops-board-head h2 { margin: 0; font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); }
 .lb { display: flex; flex-direction: column; gap: 2px; }
-.ops-f[hidden] { display: none; }
 .lb-head, .lb-row { display: grid; grid-template-columns: 2rem 1fr auto 1.5rem; align-items: center; gap: var(--cds-gap-sm); padding: 6px var(--cds-pad-sm); }
 .lb-head { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); border-bottom: 1px solid var(--color-border-line); }
 .lb-head button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }

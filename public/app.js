@@ -164,7 +164,7 @@
 
   /* ---------- state ---------- */
   const TABS = ['overview', 'leaderboard', 'input', 'output', 'outcome'];
-  const state = { l1: null, itemsMode: 'same', lbSort: 'rating', lbOrder: 'worst', lbRating: null, open: new Set(), ideal: 18, lbLimit: 50, tab: TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview' };
+  const state = { l1: null, itemsMode: 'same', lbSort: 'rating', lbOrder: 'worst', lbRatingPicked: false, open: new Set(), ideal: 18, lbLimit: 50, tab: TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview' };
   let restaurants = [], byId = {};
   const params = () => { const p = dash.params(); return { brand: p.brand || [], zone: p.zone || [], state: p.state || [], city: p.city || [], outlet: p.outlet || [], period: +(p.period || 28), daytype: p.daytype || 'all', from: p.from || '', to: p.to || '' }; };
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -390,13 +390,13 @@
   const msOutlet = multiSelect('f-outlet', 'outlet', { title: 'Outlet', noun: 'outlets', search: true });
   document.addEventListener('click', (e) => { if (!e.target.closest('.ops-ms')) closeMenus(); });
   const seg = (id, name, onPick) => $(id).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; onPick ? onPick(b.dataset.v) : dash.setParams({ [name]: name === 'period' ? +b.dataset.v : b.dataset.v }); });
-  seg('f-period', 'period', (v) => dash.setParams({ period: +v, from: '', to: '' })); seg('f-daytype', 'daytype');
+  // the leaderboard rating stays overall until the viewer picks a period or dates, even the 4 weeks already selected
+  seg('f-period', 'period', (v) => { state.lbRatingPicked = true; dash.setParams({ period: +v, from: '', to: '' }); redraw(); }); seg('f-daytype', 'daytype');
   // custom date range: both ends needed; picking one end keeps the other from the window on screen
-  const onDate = () => { let f = $('f-from').value, t = $('f-to').value; if (!f || !t) return; if (f > t) [f, t] = [t, f]; state.lbRating = null; dash.setParams({ from: f, to: t }); };
+  const onDate = () => { let f = $('f-from').value, t = $('f-to').value; if (!f || !t) return; if (f > t) [f, t] = [t, f]; state.lbRatingPicked = true; dash.setParams({ from: f, to: t }); };
   $('f-from').addEventListener('change', onDate); $('f-to').addEventListener('change', onDate);
   seg('lb-order', 'order', (v) => { state.lbOrder = v; state.lbLimit = 50; redraw(); });
-  seg('f-rating', 'rating', (v) => { state.lbRating = v; state.lbLimit = 50; redraw(); });
-  $('f-reset').addEventListener('click', () => { state.lbRating = null; dash.resetParams(); setDefaults(); state.l1 = null; });
+  $('f-reset').addEventListener('click', () => { state.lbRatingPicked = false; dash.resetParams(); setDefaults(); state.l1 = null; });
   $('ideal-tat').addEventListener('change', (e) => { const v = +e.target.value; if (v > 0) { state.ideal = v; redraw(); } });
   document.querySelectorAll('[data-items]').forEach((c) => c.addEventListener('click', () => { state.itemsMode = c.dataset.items; redraw(); }));
   document.querySelectorAll('.grp-head').forEach((b) => b.addEventListener('click', () => { const g = b.closest('.grp'); const open = g.dataset.open !== '1'; g.dataset.open = open ? '1' : '0'; b.setAttribute('aria-expanded', open); if (open) redraw(); }));
@@ -499,10 +499,7 @@
     $('f-dates').dataset.active = String(p.custom);
     if (daily.length) [['f-from', p.start], ['f-to', p.end]].forEach(([id, n]) => { const i = $(id); i.min = isoDay(dataStart); i.max = isoDay(dataEnd); if (document.activeElement !== i) i.value = isoDay(n); });
     $('f-daytype').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === p.daytype));
-    $('lb-order').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === state.lbOrder));
-    $('f-rating-wrap').hidden = state.tab !== 'leaderboard';
-    $('f-rating').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === lbRatingWindow(p)));
-    document.querySelectorAll('[data-items]').forEach((c) => c.setAttribute('aria-pressed', c.dataset.items === state.itemsMode));
+    $('lb-order').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === state.lbOrder));    document.querySelectorAll('[data-items]').forEach((c) => c.setAttribute('aria-pressed', c.dataset.items === state.itemsMode));
     $('ideal-tat').value = state.ideal;
     ['chain-input', 'chain-output', 'chain-outcome', 'input', 'output', 'outcome'].forEach((id, i) => $(id).style.setProperty('--tier', dash.colors[[2, 1, 0][i % 3]]));
     document.querySelectorAll('.ops-tab-dot').forEach((d) => d.style.background = dash.colors[{ input: 2, output: 1, outcome: 0 }[d.dataset.tier]]);
@@ -668,23 +665,16 @@
   const lbTone = (f, r, net) => (NO_NET.has(f) ? status(f, r[f]) : vsNet(f, r[f], net ? net[f] : null));
   const TONE_ORDER = { bad: 0, warn: 1, ok: 2 };
 
-  /* The leaderboard's rating window: what the viewer picked; otherwise the picked dates; otherwise overall (all history). */
-  function lbRatingWindow(p) { return state.lbRating || (p.custom ? 'dates' : 'all'); }
-  function lbRatingLabel(rw, p) {
-    if (rw === 'all') return `overall (${fmtDay(dataStart)} – ${fmtDay(dataEnd, true)})`;
-    return rw === 'dates' ? winRange(p) : PERIOD_LABEL[rw];
-  }
-  /* scope → rating fields for the window, or null when the window's own KPI rows already hold them */
-  function lbRatings(rw, p, daily) {
-    if (rw === 'dates' || (!p.custom && +rw === p.period)) return null;
-    if (rw === 'all') return cached('lb-rating-all', [daily, restaurants, p.daytype], () => {
+  /* Leaderboard rating: overall (all history) until the viewer picks a period or dates, then that window's rating. */
+  const lbRatingOverall = (p) => !state.lbRatingPicked && !p.custom;
+  /* scope → overall rating fields */
+  function lbOverallRatings(p, daily) {
+    return cached('lb-rating-all', [daily, restaurants, p.daytype], () => {
       const sum = new Map();
       const add = (id, r) => { const e = sum.get(id) || { w: 0, n: 0 }; e.w += N(r.rating_avg) * N(r.rating_count); e.n += N(r.rating_count); sum.set(id, e); };
       for (const r of daily) { if (!byId[r.restaurant_id] || !inDaytype(r, p.daytype)) continue; add(r.restaurant_id, r); add('all', r); }
       return new Map([...sum].map(([id, e]) => [id, { rating: e.n ? Math.round((100 * e.w) / e.n) / 100 : null, rating_n: e.n, rating_d: null, rating_n_d: null }]));
     });
-    const kpis = rows('kpis');
-    return cached('lb-rating-window', [kpis, rw, p.daytype], () => new Map(kpis.filter((r) => +r.period === +rw && r.daytype === p.daytype).map((r) => [r.scope, { rating: r.rating, rating_n: r.rating_n, rating_d: r.rating_d, rating_n_d: r.rating_n_d }])));
   }
 
   function drawLeaderboard(p, info, kp, net) {
@@ -692,16 +682,17 @@
     // one outlet picked: list its brand / city peers so the row stays in context
     const ids = info.single ? info.pool : info.ids, brandCity = p.brand.length + p.zone.length + p.state.length + p.city.length > 0;
     let list = kp.filter((r) => ids.has(r.scope) && +r.period === p.period && r.daytype === p.daytype);
-    // the rating columns follow the rating window; everything else follows the period
-    const rw = lbRatingWindow(p), ratings = lbRatings(rw, p, rows('daily'));
-    if (ratings) {
+    // by default the rating is overall while everything else follows the period
+    const overall = lbRatingOverall(p);
+    if (overall) {
+      const ratings = lbOverallRatings(p, rows('daily'));
       list = list.map((r) => Object.assign({}, r, ratings.get(r.scope)));
       net = net && Object.assign({}, net, ratings.get('all'));
     }
     const k = state.lbSort, dir = (GOOD[k] === 'low' ? 1 : -1) * (state.lbOrder === 'worst' ? -1 : 1);
     list.sort((a, b) => ((a[k] == null) - (b[k] == null)) || dir * (a[k] - b[k]));
     $('lb').querySelectorAll('[data-sort]').forEach((h) => h.setAttribute('aria-sort', h.dataset.sort === k ? (dir > 0 ? 'ascending' : 'descending') : 'none'));
-    $('lb-note').textContent = `${list.length} outlets${(info.single ? brandCity : info.any) ? ' in the current filter' : ''} · ${winLabel(p)} · Rating: ${lbRatingLabel(rw, p)}. Open a row to see why: input → output → outcome, each against the network.`;
+    $('lb-note').textContent = `${list.length} outlets${(info.single ? brandCity : info.any) ? ' in the current filter' : ''} · ${winLabel(p)} · Rating: ${overall ? `overall (${fmtDay(dataStart)} – ${fmtDay(dataEnd, true)})` : winLabel(p)}. Open a row to see why: input → output → outcome, each against the network.`;
     const ext = {}; Object.values(LBT).flat().forEach(([f]) => { const vs = list.map((r) => r[f]).concat(net ? [net[f]] : []).filter((v) => v != null); ext[f] = [d3.min(vs), d3.max(vs)]; });
     const Wh = (scope) => where({ scope, period: p.period, daytype: p.daytype });
     const m = (scope, f, text, cls) => `<span class="${cls || ''}" data-source="kpis" data-field="${f}" data-where="${attr(Wh(scope))}">${text}</span>`;
