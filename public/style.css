@@ -117,7 +117,8 @@
 .ops-board-head { display: flex; align-items: center; gap: var(--cds-gap-md); flex-wrap: wrap; }
 .ops-board-head h2 { margin: 0; font-family: var(--font-anthropic-serif); font-weight: 400; font-size: var(--cds-font-size-title); }
 .lb { display: flex; flex-direction: column; gap: 2px; }
-.lb-head, .lb-row { display: grid; grid-template-columns: 2rem minmax(9rem, 1.4fr) minmax(7rem, 1fr) minmax(5rem, .8fr) minmax(7rem, 1fr) minmax(6rem, 1fr) minmax(8rem, 1.2fr) 1.5rem; align-items: center; gap: var(--cds-gap-sm); padding: 6px var(--cds-pad-sm); }
+.ops-f[hidden] { display: none; }
+.lb-head, .lb-row { display: grid; grid-template-columns: 2rem 1fr auto 1.5rem; align-items: center; gap: var(--cds-gap-sm); padding: 6px var(--cds-pad-sm); }
 .lb-head { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); border-bottom: 1px solid var(--color-border-line); }
 .lb-head button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; }
 .lb-head button[aria-sort]:not([aria-sort=none]) { color: var(--color-fg); font-weight: 500; }
@@ -267,6 +268,9 @@
 .lb-drivers span { font-weight: 600; }
 .lb-drivers span.bad { background: var(--color-bad-soft); border-color: transparent; color: var(--color-bad); }
 .lb-drivers span.warn { background: var(--color-warn-soft); border-color: transparent; color: var(--color-warn); }
+.lb-drivers span.ok { background: var(--color-ok-soft); border-color: transparent; color: var(--color-ok); }
+.lb-na { color: var(--color-fg-muted); }
+.lb-m .v.ok { color: var(--color-ok); }
 .lb-row:hover { background: #f9fafb; }
 .lb-row[aria-expanded=true] { background: var(--color-accent-soft); }
 .lb-tier { background: linear-gradient(180deg, color-mix(in srgb, var(--tier) 8%, #fff) 0, #fff 60px); }
@@ -288,7 +292,12 @@
 .grp-sum .ops-kpi .v { font-size: 1.1rem; }
 /* leaderboard: wider outlet column so long names stay on one line (desktop only; phones keep their own layout) */
 @media (min-width: 761px) {
-  .lb-head, .lb-row { grid-template-columns: 2rem minmax(13rem, 2.1fr) minmax(7rem, 1fr) minmax(4rem, .6fr) minmax(6.5rem, .9fr) minmax(6rem, .8fr) minmax(8rem, 1.2fr) 1.5rem; }
+  .lb-head, .lb-row { grid-template-columns: 2rem minmax(11rem, 2fr) minmax(8rem, 1fr) repeat(5, minmax(3.75rem, .55fr)) minmax(10rem, 1.8fr) 1.5rem; }
+}
+/* narrow laptops and tablets: the columns scroll inside the board, the page itself does not */
+@media (min-width: 761px) and (max-width: 960px) {
+  .lb { overflow-x: auto; }
+  .lb-head, .lb-row, .lb-diag.open { min-width: 880px; }
 }
 .ops-kpi[title]:not([title=""]) { cursor: help; }   /* tiles with a hover explanation */
 /* leaderboard breakdown, Outcome panel: stat cards for totals */

@@ -38,6 +38,8 @@
     <span class="ops-f">Days <span class="ops-seg" id="f-daytype" role="group" aria-label="Day type">
       <button type="button" data-v="all">All</button><button type="button" data-v="weekday">Weekday</button><button type="button" data-v="weekend">Weekend</button></span></span>
     <span class="ops-f">Dates <span class="ops-dates" id="f-dates"><input type="date" id="f-from" aria-label="From date"><span>–</span><input type="date" id="f-to" aria-label="To date"></span></span>
+    <span class="ops-f" id="f-rating-wrap" hidden>Rating <span class="ops-seg" id="f-rating" role="group" aria-label="Leaderboard rating window">
+      <button type="button" data-v="all">Overall</button><button type="button" data-v="28">4 weeks</button><button type="button" data-v="84">12 weeks</button></span></span>
     <button type="button" class="ops-reset" id="f-reset">Reset filters</button>
   </div>
   </div>
@@ -74,10 +76,12 @@
       <div class="lb-head">
         <span>#</span><span>Outlet</span>
         <button type="button" data-sort="rating">Rating</button>
-        <button type="button" data-sort="rating_n" class="hide-sm"># ratings</button>
-        <button type="button" data-sort="sale_loss" class="hide-sm">Sale loss (cancelled ₹)</button>
-        <button type="button" data-sort="refund" class="hide-sm">Refunds ₹</button>
-        <span class="hide-sm">Flags vs network</span><span></span>
+        <button type="button" data-sort="complaint_pct" class="hide-sm">Concerns %</button>
+        <button type="button" data-sort="kpt" class="hide-sm">KPT</button>
+        <button type="button" data-sort="mfr_correct_pct" class="hide-sm">Correct MFR</button>
+        <button type="button" data-sort="vis_pct" class="hide-sm">Visibility</button>
+        <span class="hide-sm" title="Out-of-stock report not loaded yet">Out of stock</span>
+        <span class="hide-sm" title="Green: as good as or better than the network. Amber: slightly worse. Red: clearly worse.">Flags vs network</span><span></span>
       </div>
       <div id="lb-rows"></div>
     </div>

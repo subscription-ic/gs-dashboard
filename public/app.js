@@ -164,7 +164,7 @@
 
   /* ---------- state ---------- */
   const TABS = ['overview', 'leaderboard', 'input', 'output', 'outcome'];
-  const state = { l1: null, itemsMode: 'same', lbSort: 'rating', lbOrder: 'worst', open: new Set(), ideal: 18, lbLimit: 50, tab: TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview' };
+  const state = { l1: null, itemsMode: 'same', lbSort: 'rating', lbOrder: 'worst', lbRating: null, open: new Set(), ideal: 18, lbLimit: 50, tab: TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview' };
   let restaurants = [], byId = {};
   const params = () => { const p = dash.params(); return { brand: p.brand || [], zone: p.zone || [], state: p.state || [], city: p.city || [], outlet: p.outlet || [], period: +(p.period || 28), daytype: p.daytype || 'all', from: p.from || '', to: p.to || '' }; };
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
@@ -392,10 +392,11 @@
   const seg = (id, name, onPick) => $(id).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; onPick ? onPick(b.dataset.v) : dash.setParams({ [name]: name === 'period' ? +b.dataset.v : b.dataset.v }); });
   seg('f-period', 'period', (v) => dash.setParams({ period: +v, from: '', to: '' })); seg('f-daytype', 'daytype');
   // custom date range: both ends needed; picking one end keeps the other from the window on screen
-  const onDate = () => { let f = $('f-from').value, t = $('f-to').value; if (!f || !t) return; if (f > t) [f, t] = [t, f]; dash.setParams({ from: f, to: t }); };
+  const onDate = () => { let f = $('f-from').value, t = $('f-to').value; if (!f || !t) return; if (f > t) [f, t] = [t, f]; state.lbRating = null; dash.setParams({ from: f, to: t }); };
   $('f-from').addEventListener('change', onDate); $('f-to').addEventListener('change', onDate);
   seg('lb-order', 'order', (v) => { state.lbOrder = v; state.lbLimit = 50; redraw(); });
-  $('f-reset').addEventListener('click', () => { dash.resetParams(); setDefaults(); state.l1 = null; });
+  seg('f-rating', 'rating', (v) => { state.lbRating = v; state.lbLimit = 50; redraw(); });
+  $('f-reset').addEventListener('click', () => { state.lbRating = null; dash.resetParams(); setDefaults(); state.l1 = null; });
   $('ideal-tat').addEventListener('change', (e) => { const v = +e.target.value; if (v > 0) { state.ideal = v; redraw(); } });
   document.querySelectorAll('[data-items]').forEach((c) => c.addEventListener('click', () => { state.itemsMode = c.dataset.items; redraw(); }));
   document.querySelectorAll('.grp-head').forEach((b) => b.addEventListener('click', () => { const g = b.closest('.grp'); const open = g.dataset.open !== '1'; g.dataset.open = open ? '1' : '0'; b.setAttribute('aria-expanded', open); if (open) redraw(); }));
@@ -499,6 +500,8 @@
     if (daily.length) [['f-from', p.start], ['f-to', p.end]].forEach(([id, n]) => { const i = $(id); i.min = isoDay(dataStart); i.max = isoDay(dataEnd); if (document.activeElement !== i) i.value = isoDay(n); });
     $('f-daytype').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === p.daytype));
     $('lb-order').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === state.lbOrder));
+    $('f-rating-wrap').hidden = state.tab !== 'leaderboard';
+    $('f-rating').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === lbRatingWindow(p)));
     document.querySelectorAll('[data-items]').forEach((c) => c.setAttribute('aria-pressed', c.dataset.items === state.itemsMode));
     $('ideal-tat').value = state.ideal;
     ['chain-input', 'chain-output', 'chain-outcome', 'input', 'output', 'outcome'].forEach((id, i) => $(id).style.setProperty('--tier', dash.colors[[2, 1, 0][i % 3]]));
@@ -652,16 +655,53 @@
   };
   // counts and ₹ are network totals, not a typical outlet, so these rows show the outlet's value without a network comparison
   const NO_NET = new Set(['rating_n', 'sale_loss', 'refund', 'guest_value', 'crit_total']);
-  const FLAGS = [['kpt', 'KPT'], ['vis_pct', 'Visibility'], ['mfr_correct_pct', 'MFR'], ['handover', 'Handover'], ['product_pct', 'Product'], ['service_pct', 'Service'], ['cancel_pct', 'Cancels'], ['crit_total', 'Critical']];
+  const FLAGS = [['kpt', 'KPT', 'min'], ['mfr_correct_pct', 'MFR', 'pct'], ['vis_pct', 'Visibility', 'pct'], ['handover', 'Handover', 'min'], ['product_pct', 'Product', 'pct'], ['service_pct', 'Service', 'pct'], ['cancel_pct', 'Cancels', 'pct'], ['crit_total', 'Critical', 'int']];
+  // how much worse than the network is still "slightly worse" (amber); anything further is red; other metrics allow 10%
+  const NET_TOL = { rating: 0.1, kpt: 1, kpt_peak: 1, kpt_gt10_pct: 5, vis_pct: 2, mfr_correct_pct: 5, handover: 0.5, wait_arr_pct: 5, tat: 2, complaint_pct: 0.5, product_pct: 0.2, service_pct: 0.2, cancel_pct: 0.2 };
+  const vsNet = (f, v, n) => {
+    if (v == null || n == null) return '';
+    const worse = GOOD[f] === 'high' ? n - v : v - n;
+    if (worse <= 0) return 'ok';
+    return worse <= (NET_TOL[f] != null ? NET_TOL[f] : Math.abs(n) * 0.1) ? 'warn' : 'bad';
+  };
+  // critical incidents are rare counts, so they are judged on their own target; everything else against the network
+  const lbTone = (f, r, net) => (NO_NET.has(f) ? status(f, r[f]) : vsNet(f, r[f], net ? net[f] : null));
+  const TONE_ORDER = { bad: 0, warn: 1, ok: 2 };
+
+  /* The leaderboard's rating window: what the viewer picked; otherwise the picked dates; otherwise overall (all history). */
+  function lbRatingWindow(p) { return state.lbRating || (p.custom ? 'dates' : 'all'); }
+  function lbRatingLabel(rw, p) {
+    if (rw === 'all') return `overall (${fmtDay(dataStart)} – ${fmtDay(dataEnd, true)})`;
+    return rw === 'dates' ? winRange(p) : PERIOD_LABEL[rw];
+  }
+  /* scope → rating fields for the window, or null when the window's own KPI rows already hold them */
+  function lbRatings(rw, p, daily) {
+    if (rw === 'dates' || (!p.custom && +rw === p.period)) return null;
+    if (rw === 'all') return cached('lb-rating-all', [daily, restaurants, p.daytype], () => {
+      const sum = new Map();
+      const add = (id, r) => { const e = sum.get(id) || { w: 0, n: 0 }; e.w += N(r.rating_avg) * N(r.rating_count); e.n += N(r.rating_count); sum.set(id, e); };
+      for (const r of daily) { if (!byId[r.restaurant_id] || !inDaytype(r, p.daytype)) continue; add(r.restaurant_id, r); add('all', r); }
+      return new Map([...sum].map(([id, e]) => [id, { rating: e.n ? Math.round((100 * e.w) / e.n) / 100 : null, rating_n: e.n, rating_d: null, rating_n_d: null }]));
+    });
+    const kpis = rows('kpis');
+    return cached('lb-rating-window', [kpis, rw, p.daytype], () => new Map(kpis.filter((r) => +r.period === +rw && r.daytype === p.daytype).map((r) => [r.scope, { rating: r.rating, rating_n: r.rating_n, rating_d: r.rating_d, rating_n_d: r.rating_n_d }])));
+  }
+
   function drawLeaderboard(p, info, kp, net) {
     const box = $('lb-rows');
     // one outlet picked: list its brand / city peers so the row stays in context
     const ids = info.single ? info.pool : info.ids, brandCity = p.brand.length + p.zone.length + p.state.length + p.city.length > 0;
     let list = kp.filter((r) => ids.has(r.scope) && +r.period === p.period && r.daytype === p.daytype);
+    // the rating columns follow the rating window; everything else follows the period
+    const rw = lbRatingWindow(p), ratings = lbRatings(rw, p, rows('daily'));
+    if (ratings) {
+      list = list.map((r) => Object.assign({}, r, ratings.get(r.scope)));
+      net = net && Object.assign({}, net, ratings.get('all'));
+    }
     const k = state.lbSort, dir = (GOOD[k] === 'low' ? 1 : -1) * (state.lbOrder === 'worst' ? -1 : 1);
     list.sort((a, b) => ((a[k] == null) - (b[k] == null)) || dir * (a[k] - b[k]));
     $('lb').querySelectorAll('[data-sort]').forEach((h) => h.setAttribute('aria-sort', h.dataset.sort === k ? (dir > 0 ? 'ascending' : 'descending') : 'none'));
-    $('lb-note').textContent = `${list.length} outlets${(info.single ? brandCity : info.any) ? ' in the current filter' : ''} · ${winLabel(p)}. Open a row to see why: input → output → outcome, each against the network.`;
+    $('lb-note').textContent = `${list.length} outlets${(info.single ? brandCity : info.any) ? ' in the current filter' : ''} · ${winLabel(p)} · Rating: ${lbRatingLabel(rw, p)}. Open a row to see why: input → output → outcome, each against the network.`;
     const ext = {}; Object.values(LBT).flat().forEach(([f]) => { const vs = list.map((r) => r[f]).concat(net ? [net[f]] : []).filter((v) => v != null); ext[f] = [d3.min(vs), d3.max(vs)]; });
     const Wh = (scope) => where({ scope, period: p.period, daytype: p.daytype });
     const m = (scope, f, text, cls) => `<span class="${cls || ''}" data-source="kpis" data-field="${f}" data-where="${attr(Wh(scope))}">${text}</span>`;
@@ -672,33 +712,36 @@
     box.innerHTML = shown.map(([r, i]) => {
       const rr = byId[r.scope] || { name: r.scope, city: '' };
       const open = state.open.has(r.scope);
-      const flags = FLAGS.map(([f, l]) => [l, status(f, r[f])]).filter(([, s]) => s === 'bad' || s === 'warn').sort((a) => (a[1] === 'bad' ? -1 : 1)).slice(0, 3);
+      // worst first: red, amber, then green; anything red or amber that does not fit is counted in a "+n" chip
+      const allFlags = FLAGS.map(([f, l, fmt]) => ({ l, s: lbTone(f, r, net), tip: f === 'crit_total' ? `${F.int(r[f])} critical incidents` : `${l}: ${F[fmt](r[f])} vs network ${net ? F[fmt](net[f]) : '—'}` })).filter((x) => x.s).sort((a, b) => TONE_ORDER[a.s] - TONE_ORDER[b.s]);
+      const flags = allFlags.slice(0, 3), extraFlags = allFlags.slice(3).filter((x) => x.s !== 'ok');
       const stars = r.rating == null ? '' : '★'.repeat(Math.round(r.rating)) + '☆'.repeat(5 - Math.round(r.rating));
       let html = (i === fi && fi >= limit ? '<div class="lb-gap">⋯</div>' : '') + `<div class="lb-row${info.single === r.scope ? ' focus' : ''}" data-id="${r.scope}" role="button" aria-expanded="${open}">
         <span class="lb-rank">${i + 1}</span>
         <span class="lb-name">${rr.name}<small>${rr.city}</small></span>
         <span class="lb-rating"><span class="lb-stars">${stars}</span>${m(r.scope, 'rating', F.rating(r.rating), 'v')}<span class="lb-d">${m(r.scope, 'rating_d', r.rating_d == null ? '' : SIGNED.rating(r.rating_d), deltaClass('rating', r.rating_d))}</span></span>
-        <span class="hide-sm">${m(r.scope, 'rating_n', F.int(r.rating_n))}</span>
-        <span class="hide-sm">${m(r.scope, 'sale_loss', F.inr(r.sale_loss))}</span>
-        <span class="hide-sm">${m(r.scope, 'refund', F.inr(r.refund))}</span>
-        <span class="lb-drivers hide-sm">${flags.map(([l, s]) => `<span class="${s}">${l}</span>`).join('') || '<span>no flags</span>'}</span>
+        <span class="hide-sm">${m(r.scope, 'complaint_pct', F.pct(r.complaint_pct))}</span>
+        <span class="hide-sm">${m(r.scope, 'kpt', F.min(r.kpt))}</span>
+        <span class="hide-sm">${m(r.scope, 'mfr_correct_pct', F.pct(r.mfr_correct_pct))}</span>
+        <span class="hide-sm">${m(r.scope, 'vis_pct', F.pct(r.vis_pct))}</span>
+        <span class="hide-sm lb-na" title="Out-of-stock report not loaded yet">—</span>
+        <span class="lb-drivers hide-sm">${flags.map((x) => `<span class="${x.s}" title="${attr(x.tip)}">${x.l}</span>`).join('') || '<span>no data</span>'}${extraFlags.length ? `<span title="${attr(extraFlags.map((x) => x.tip).join(' · '))}">+${extraFlags.length}</span>` : ''}</span>
         <svg class="lb-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></div>`;
       if (open) {
         const label = (f, l) => (f === 'rating' && r.rating != null ? `${l} <span class="lb-stars">${'★'.repeat(Math.round(r.rating))}${'☆'.repeat(5 - Math.round(r.rating))}</span>` : l);
         // Outcome: rating keeps its network bar; the totals become stat cards with their change
         const stat = ([f, l, fmt]) => { const d = r[f + '_d']; return `<div class="lb-stat"><span class="n">${l}</span>${m(r.scope, f, F[fmt](r[f]), 'v')}${d == null ? '' : `<span class="dv ${deltaClass(f, d)}">${(SIGNED[fmt] || SIGNED.num1)(d)}</span>`}</div>`; };
         const extra = (key) => (key !== 'outcome' ? '' : `<div class="lb-stats">${LBT.outcome.filter(([f]) => NO_NET.has(f)).map(stat).join('')}</div>`);
-        // value colour follows the same rule as its bar: green when as good as or better than the network, red when worse
-        // (in the metric's own direction); rows without a network comparison keep their target colour
-        const tone = (f) => { if (NO_NET.has(f)) return status(f, r[f]); if (r[f] == null || !net || net[f] == null) return ''; return (GOOD[f] === 'high' ? r[f] < net[f] : r[f] > net[f]) ? 'bad' : 'ok'; };
+        // value, bar and flag all use one rule; rows without a network comparison keep their target colour
+        const tone = (f) => lbTone(f, r, net);
         const tier = (key, title, sub, color) => `<div class="lb-tier" style="--tier:${color}"><h4>${title}<small>${sub}</small></h4>` + LBT[key].filter(([f]) => key !== 'outcome' || !NO_NET.has(f)).map(([f, l, fmt]) => `<div class="lb-m"><span class="n">${label(f, l)}</span>${m(r.scope, f, F[fmt](r[f]), 'v ' + tone(f))}` + (NO_NET.has(f) ? '<span class="net"></span></div>' : `<span class="net">${net ? m('all', f, F[fmt](net[f])) : '—'} net</span><div class="db" data-f="${f}"></div></div>`)).join('') + extra(key) + '</div>';
         html += `<div class="lb-diag open" data-id="${r.scope}">${tier('input', 'Input', 'operational causes', dash.colors[2])}${tier('output', 'Output', '→ what went wrong', dash.colors[1])}${tier('outcome', 'Outcome', '→ what the customer sees', dash.colors[0])}
-          <div class="lb-actions">${info.single === r.scope ? `${p.outlet.length ? `<button type="button" data-clearfocus="1">Back to ${brandCity ? 'all outlets in the filter' : 'network view'}</button>` : ''}<span>Every chart on the page is showing this outlet.</span>` : `<button type="button" data-focus="${r.scope}">Focus every chart on ${rr.name}</button><span>Dot = outlet, grey dot = network; red when worse.</span>`}</div></div>`;
+          <div class="lb-actions">${info.single === r.scope ? `${p.outlet.length ? `<button type="button" data-clearfocus="1">Back to ${brandCity ? 'all outlets in the filter' : 'network view'}</button>` : ''}<span>Every chart on the page is showing this outlet.</span>` : `<button type="button" data-focus="${r.scope}">Focus every chart on ${rr.name}</button><span>Dot = outlet, grey dot = network. Green: as good or better. Amber: slightly worse. Red: clearly worse.</span>`}</div></div>`;
       }
       return html;
     }).join('') + (more > 0 ? `<div class="lb-more"><button type="button" data-more="1">Show ${Math.min(LB_STEP, more)} more</button><span>${limit} of ${list.length} outlets shown</span></div>` : '');
     // dumbbells
-    box.querySelectorAll('.lb-diag').forEach((d) => { const r = list.find((x) => x.scope === d.dataset.id); d.querySelectorAll('.db').forEach((db) => { const f = db.dataset.f; const [lo, hi] = ext[f]; C.dumbbell(db, r[f], net ? net[f] : null, lo, hi, GOOD[f] || 'low'); }); });
+    box.querySelectorAll('.lb-diag').forEach((d) => { const r = list.find((x) => x.scope === d.dataset.id); d.querySelectorAll('.db').forEach((db) => { const f = db.dataset.f; const [lo, hi] = ext[f]; C.dumbbell(db, r[f], net ? net[f] : null, lo, hi, lbTone(f, r, net)); }); });
   }
 
   dash.onData(draw);

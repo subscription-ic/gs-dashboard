@@ -264,15 +264,15 @@
   };
 
   /* Dumbbell: outlet vs network for diagnostics. values {v, net}, domain [lo, hi], good: 'low'|'high' */
-  C.dumbbell = function (el, v, net, lo, hi, good) {
+  C.dumbbell = function (el, v, net, lo, hi, tone) {
     const h = 14; const { svg, w } = svgIn(el, h);
     if (v == null || net == null) return;
     const x = d3.scaleLinear([lo, hi], [6, w - 6]).clamp(true);
     svg.append('line').attr('x1', 6).attr('x2', w - 6).attr('y1', 7).attr('y2', 7).attr('stroke', 'var(--cds-chart-grid)').attr('stroke-width', 3).attr('stroke-linecap', 'round');
-    const worse = good === 'low' ? v > net : v < net;
-    svg.append('line').attr('x1', x(net)).attr('x2', x(v)).attr('y1', 7).attr('y2', 7).attr('stroke', worse ? 'var(--cds-chart-status-critical)' : 'var(--color-ok)').attr('stroke-width', 3).attr('stroke-linecap', 'round').attr('opacity', 0.6);
+    const color = tone === 'bad' ? 'var(--cds-chart-status-critical)' : tone === 'warn' ? 'var(--color-warn-dot)' : 'var(--color-ok)';
+    svg.append('line').attr('x1', x(net)).attr('x2', x(v)).attr('y1', 7).attr('y2', 7).attr('stroke', color).attr('stroke-width', 3).attr('stroke-linecap', 'round').attr('opacity', 0.6);
     svg.append('circle').attr('cx', x(net)).attr('cy', 7).attr('r', 3.5).attr('fill', 'var(--cds-chart-muted)');
-    svg.append('circle').attr('cx', x(v)).attr('cy', 7).attr('r', 4.5).attr('fill', worse ? 'var(--cds-chart-status-critical)' : 'var(--color-ok)');
+    svg.append('circle').attr('cx', x(v)).attr('cy', 7).attr('r', 4.5).attr('fill', color);
   };
 
   /* Day-part strip: parts [{label, v, n}] small columns with value labels; opts.unit names n in the tooltip */
