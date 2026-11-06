@@ -71,6 +71,7 @@
       rating: s.rating_count ? r2(ratingW / s.rating_count) : null, rating_n: s.rating_count || 0,
       sale_loss: s.cancelled_value || 0, refund: s.refund_amt || 0, guest_value: (s.refund_amt || 0) + (s.cancelled_value || 0),
       cancelled: s.cancelled || 0, cancel_pct: pc(s.cancelled || 0), completion_pct: o ? r1(100 - (100 * (s.cancelled || 0)) / o) : null,
+      product: s.product_concern || 0, service: s.service_concern || 0,
       complaints: comp, complaint_pct: pc(comp), product_pct: pc(s.product_concern || 0), service_pct: pc(s.service_concern || 0),
       product_share: pcomp(s.product_concern || 0), service_share: pcomp(s.service_concern || 0),
       unique: s.unique_concern || 0, multi: s.multi_concern || 0, unique_pct: pc(s.unique_concern || 0), multi_pct: pc(s.multi_concern || 0),
@@ -235,6 +236,7 @@
   function mkTile(container, spec) {
     const el = document.createElement('div'); el.className = 'ops-kpi' + (spec.small ? ' small' : '');
     el.innerHTML = `<span class="l"></span><span class="v${spec.big ? '' : ' sm'}" data-source="${spec.source || 'kpis'}" data-field="${spec.field}">—</span>` + (spec.delta === false ? '' : `<span class="d"><span class="dv" data-source="kpis" data-field="${spec.field}_d">—</span><span class="dl"></span></span>`);
+    if (spec.base) el.querySelector('.v').insertAdjacentHTML('afterend', '<span class="b"></span>');   // which orders the figure is out of
     el.querySelector('.l').textContent = spec.label;
     if (spec.tag) el.querySelector('.l').insertAdjacentHTML('beforeend', ` <i class="ops-tag ${spec.tag.toLowerCase()}">${spec.tag}</i>`);
     el.dataset.field = spec.field; el._spec = spec;
@@ -250,6 +252,7 @@
     vEl.dataset.where = where(s.source === 'hourly_cuts' ? { scope: p.scope, daytype: p.daytype, part: s.part } : s.source === 'cancel_mix' ? { scope: p.scope, period: p.period, level: s.level, name: s.name } : { scope: p.scope, period: p.period, daytype: p.daytype });
     vEl.textContent = fmt(v);
     if (s.tip) el.title = row ? s.tip(row) : '';
+    if (s.base) el.querySelector('.b').textContent = row ? s.base(row) : '';
     vEl.className = 'v' + (s.big ? '' : ' sm') + ' ' + (s.nostatus ? 'none' : status(s.statusAs || s.field, v) || 'none');
     el.classList.toggle('lowconf', s.field === 'rating' && row && row.rating_n < 30);
     if (s.field === 'rating' && s.stars) { let st = el.querySelector('.ops-stars'); if (!st) { st = document.createElement('span'); st.className = 'ops-stars'; vEl.after(st); } st.textContent = v == null ? '' : '★'.repeat(Math.round(v)) + '☆'.repeat(5 - Math.round(v)); }
@@ -263,15 +266,20 @@
     }
   }
 
+  // the base a figure is out of, spelled out on its tile
+  const ofOrders = (f) => (r) => `${F.int(r[f])} of ${F.int(r.orders)} total orders`;
+  const inOrders = (r) => `out of ${F.int(r.orders)} total orders`;
+  const ofConcerns = (f) => (r) => `${F.int(r[f])} of ${F.int(r.complaints)} concern orders`;
+
   // Causal chain
   tiles('chain-input-kpis', [
     { label: 'KPT', field: 'kpt', fmt: 'min', big: true }, { label: 'Peak KPT', field: 'kpt_peak', fmt: 'min' }, { label: 'Orders over 10 min', field: 'kpt_gt10_pct', fmt: 'pct' },
     { label: 'Visibility', field: 'vis_pct', fmt: 'pct' }, { label: 'Correct MFR', field: 'mfr_correct_pct', fmt: 'pct' }, { label: 'Handover', field: 'handover', fmt: 'min' }, { label: 'Order → pickup', field: 'tat', fmt: 'min', tip: () => 'Order placed → rider picks up the food' },
   ]);
   tiles('chain-output-kpis', [
-    { label: 'Total concerns', field: 'complaint_pct', fmt: 'pct', big: true, tip: () => 'Orders with at least one IGCC complaint ÷ orders' }, { label: 'Total concerns (count)', field: 'complaints', fmt: 'int', nostatus: true, tip: () => 'Orders with at least one IGCC complaint' },
-    { label: 'Product concern', field: 'product_pct', fmt: 'pct' }, { label: 'Service concern', field: 'service_pct', fmt: 'pct' },
-    { label: 'Critical incidents', field: 'crit_total', fmt: 'int' }, { label: 'Cancelled', field: 'cancel_pct', fmt: 'pct' },
+    { label: 'Total concerns', field: 'complaint_pct', fmt: 'pct', big: true, base: ofOrders('complaints'), tip: () => 'Orders with at least one IGCC complaint ÷ total orders' }, { label: 'Total concerns (count)', field: 'complaints', fmt: 'int', nostatus: true, base: inOrders, tip: () => 'Orders with at least one IGCC complaint' },
+    { label: 'Product concern', field: 'product_pct', fmt: 'pct', base: ofOrders('product') }, { label: 'Service concern', field: 'service_pct', fmt: 'pct', base: ofOrders('service') },
+    { label: 'Critical incidents', field: 'crit_total', fmt: 'int', base: inOrders }, { label: 'Cancelled', field: 'cancel_pct', fmt: 'pct', base: ofOrders('cancelled') },
     { label: 'Sale loss', field: 'sale_loss', fmt: 'inr', nostatus: true }, { label: 'Refunds', field: 'refund', fmt: 'inr', nostatus: true },
   ]);
   tiles('chain-outcome-kpis', [
@@ -300,9 +308,9 @@
   tiles('t-rating', [{ label: 'Average rating', field: 'rating', fmt: 'rating', big: true, stars: true }, { label: 'Number of ratings', field: 'rating_n', fmt: 'int', nostatus: true }, { label: 'Orders', field: 'orders', fmt: 'int', nostatus: true }]);
   tiles('t-saleloss', [{ label: 'Cancelled order value', field: 'sale_loss', fmt: 'inr', big: true, nostatus: true }, { label: 'Cancelled orders', field: 'cancelled', fmt: 'int', nostatus: true, delta: false }, { label: 'Cancelled %', field: 'cancel_pct', fmt: 'pct' }]);
   tiles('t-guestvalue', [{ label: 'Total sale loss', field: 'guest_value', fmt: 'inr', big: true, nostatus: true, tip: () => 'Refunds + cancelled order value' }, { label: 'IGCC refunds', field: 'refund', fmt: 'inr', nostatus: true }, { label: 'Cancelled value', field: 'sale_loss', fmt: 'inr', nostatus: true }]);
-  tiles('t-concerns', [{ label: 'Product concern (quality, quantity)', field: 'product_pct', fmt: 'pct', big: true }, { label: 'Service concern (packaging, missing, wrong)', field: 'service_pct', fmt: 'pct', big: true }, { label: 'Total concerns', field: 'complaint_pct', fmt: 'pct' }, { label: 'Total concerns (count)', field: 'complaints', fmt: 'int', nostatus: true }]);
-  tiles('t-concern-count', [{ label: 'Unique concern orders', field: 'unique', fmt: 'int', nostatus: true, delta: false }, { label: 'Unique %', field: 'unique_pct', fmt: 'pct', nostatus: true }, { label: 'Multiple concern orders', field: 'multi', fmt: 'int', nostatus: true, delta: false }, { label: 'Multiple %', field: 'multi_pct', fmt: 'pct' }]);
-  tiles('t-cancel', [{ label: 'Cancelled %', field: 'cancel_pct', fmt: 'pct', big: true }, { label: 'Order completion', field: 'completion_pct', fmt: 'pct' }, { label: 'Cancelled orders', field: 'cancelled', fmt: 'int', nostatus: true, delta: false }, { label: 'Top reason', field: 'pct', fmt: 'pct', source: 'cancel_mix', level: 'reason', name: '', nostatus: true, delta: false, top: true }]);
+  tiles('t-concerns', [{ label: 'Product concern (quality, quantity)', field: 'product_pct', fmt: 'pct', big: true, base: ofOrders('product') }, { label: 'Service concern (packaging, missing, wrong)', field: 'service_pct', fmt: 'pct', big: true, base: ofOrders('service') }, { label: 'Total concerns', field: 'complaint_pct', fmt: 'pct', base: ofOrders('complaints') }, { label: 'Total concerns (count)', field: 'complaints', fmt: 'int', nostatus: true, base: inOrders }]);
+  tiles('t-concern-count', [{ label: 'Orders with 1 concern type', field: 'unique', fmt: 'int', nostatus: true, delta: false, base: ofConcerns('unique'), tip: () => 'The order was raised under one L1 type, such as Quality or Missing' }, { label: '1 concern type, % of total orders', field: 'unique_pct', fmt: 'pct', nostatus: true, base: ofOrders('unique') }, { label: 'Orders with 2+ concern types', field: 'multi', fmt: 'int', nostatus: true, delta: false, base: ofConcerns('multi'), tip: () => 'The same order was raised under two or more L1 types' }, { label: '2+ concern types, % of total orders', field: 'multi_pct', fmt: 'pct', base: ofOrders('multi') }]);
+  tiles('t-cancel', [{ label: 'Cancelled %', field: 'cancel_pct', fmt: 'pct', big: true, base: ofOrders('cancelled') }, { label: 'Order completion', field: 'completion_pct', fmt: 'pct' }, { label: 'Cancelled orders', field: 'cancelled', fmt: 'int', nostatus: true, delta: false }, { label: 'Top reason', field: 'pct', fmt: 'pct', source: 'cancel_mix', level: 'reason', name: '', nostatus: true, delta: false, top: true }]);
   tiles('t-refund', [{ label: 'Total refunded (IGCC)', field: 'refund', fmt: 'inr', big: true, nostatus: true }, { label: 'Complaint orders', field: 'complaints', fmt: 'int', nostatus: true, delta: false }]);
   tiles('t-tat', [{ label: 'Average order → pickup', field: 'tat', fmt: 'min', big: true }]);
   tiles('t-sales', [{ label: 'ADT · orders per outlet a day', field: 'adt', fmt: 'num1', big: true, nostatus: true }, { label: 'ADS (est.) · ₹ per outlet a day', field: 'ads', fmt: 'inr', big: true, nostatus: true }, { label: 'Orders', field: 'orders', fmt: 'int', nostatus: true, delta: false }, { label: 'Selling outlet-days', field: 'sell_days', fmt: 'int', nostatus: true, delta: false }]);
@@ -331,15 +339,15 @@
 
   // Critical badges
   const CRIT = [['veg', 'Veg / non-veg'], ['foreign', 'Foreign particle'], ['pests', 'Pests']];
-  $('t-critical').innerHTML = CRIT.map(([k, l]) => `<div class="c"><span class="l">${l}</span><div class="row"><span class="ops-badge" data-source="kpis" data-field="crit_${k}">—</span><span class="p"><span data-source="kpis" data-field="crit_${k}_pct">—</span> of orders</span></div></div>`).join('') + `<div class="c"><span class="l">All critical</span><div class="row"><span class="ops-badge" data-source="kpis" data-field="crit_total">—</span><span class="p"><span data-source="kpis" data-field="crit_total_d">—</span> vs prior</span></div></div>`;
+  $('t-critical').innerHTML = CRIT.map(([k, l]) => `<div class="c"><span class="l">${l}</span><div class="row"><span class="ops-badge" data-source="kpis" data-field="crit_${k}">—</span><span class="p"><span data-source="kpis" data-field="crit_${k}_pct">—</span> of total orders</span></div></div>`).join('') + `<div class="c"><span class="l">All critical</span><div class="row"><span class="ops-badge" data-source="kpis" data-field="crit_total">—</span><span class="p"><span data-source="kpis" data-field="crit_total_d">—</span> vs prior</span></div></div>`;
 
   // Not-available chips
   const NA = {
     rating: [['Product-wise rating', 'Swiggy rating feed has no item column']],
     saleloss: [['Sale loss %', 'Total GMV not in DB (payout file)']],
     guestvalue: [['Total sale loss % of sales', 'Needs GMV from the payout file']],
-    concerns: [['Top items by menu category', 'Partial: needs item → menu-category master; rows without a category show as Uncategorised'], ['Complaint resolution TAT (open / close / no response)', 'No complaint-resolution timestamps in IGCC']],
-    critical: [['Multiple critical per order', 'Needs order-level complaint rows'], ['Items by menu category', 'Needs item master']],
+    concerns: [['Complaints per item sold', 'Needs total items sold per item from Swiggy'], ['Top items by menu category', 'Partial: needs item → menu-category master; rows without a category show as Uncategorised'], ['Complaint resolution TAT (open / close / no response)', 'No complaint-resolution timestamps in IGCC']],
+    critical: [['Critical concerns per item sold', 'Needs total items sold per item from Swiggy'], ['Multiple critical per order', 'Needs order-level complaint rows'], ['Items by menu category', 'Needs item master']],
     cancel: [['Cancelled before / after MFR', 'Cancelled orders have no timestamp row'], ['Avg cancellation time per reason', 'RDC has date only, no cancellation timestamp']],
     refund: [['Refund greater than bill', 'IGCC has no order / bill value'], ['Net refund', 'Depends on the row above']],
     sales: [['Actual ADS', 'Needs the sales value of delivered orders (payout file)']],
@@ -349,7 +357,7 @@
     mfr: [['Order type (Instant, Std, Train, Bulk…)', 'No order-type column in the Swiggy feeds']],
     oos: [['Product type stock-up %', 'Swiggy OOS report TBD'], ['Stock-out duration', 'OOS report not loaded'], ['Source closure %', 'OOS report not loaded'], ['Status type %', 'OOS report not loaded'], ['Discounted product OOS %', 'OOS report not loaded'], ['OOS vs minimum closing balance', 'OOS report not loaded']],
   };
-  const AVAIL = { rating: [1, 2], saleloss: [2, 3], guestvalue: [1, 2], concerns: [14, 16], critical: [9, 11], cancel: [6, 8], refund: [2, 4], sales: [1, 2], kpt: [10, 13], vis: [5, 7], agg: [2, 3], mfr: [8, 9], oos: [0, 6] };
+  const AVAIL = { rating: [1, 2], saleloss: [2, 3], guestvalue: [1, 2], concerns: [14, 17], critical: [9, 12], cancel: [6, 8], refund: [2, 4], sales: [1, 2], kpt: [10, 13], vis: [5, 7], agg: [2, 3], mfr: [8, 9], oos: [0, 6] };
   Object.entries(NA).forEach(([g, list]) => { $('na-' + g).innerHTML = '<b>Not yet available</b>' + list.map(([l, note]) => `<span title="${note}">${l}<i> · ${note}</i></span>`).join(''); });
   Object.entries(AVAIL).forEach(([g, [a, b]]) => { $('avail-' + g).textContent = `${a} of ${b} sub-metrics`; });
 
@@ -577,28 +585,32 @@
     if (vis('c-guestvalue-weekly')) C.stackedWeekly($('c-guestvalue-weekly'), W.map((w) => ({ d: w.d, parts: { refund: w.s.refund_amt, cancelled: w.s.cancelled_value } })), [{ key: 'refund', label: 'Refunds ₹', color: dash.colors[0] }, { key: 'cancelled', label: 'Cancelled value ₹', color: dash.colors[1] }]);
 
     // ---- Output: concerns
-    if (vis('c-concern-donut') && row) C.donut($('c-concern-donut'), [{ label: 'Product', value: row.product_share || 0, color: dash.colors[0] }, { label: 'Service', value: row.service_share || 0, color: dash.colors[1] }]);
-    if (vis('c-concern-split') && row) C.split($('c-concern-split'), { label: 'Unique concern', value: row.unique, color: dash.colors[0] }, { label: 'Multiple concerns', value: row.multi, color: dash.colors[3] });
+    if (vis('c-concern-donut') && row) C.donut($('c-concern-donut'), [{ label: 'Product', value: row.product, color: dash.colors[0] }, { label: 'Service', value: row.service, color: dash.colors[1] }], { center: row.complaints });
+    if (vis('c-concern-split') && row) C.split($('c-concern-split'), { label: '1 concern type', value: row.unique, color: dash.colors[0] }, { label: '2+ concern types', value: row.multi, color: dash.colors[3] });
     if (vis('c-concern-line')) { const ser = [{ name: 'Product', color: dash.colors[0], points: S.map((x) => ({ d: x.d, v: x.pct('product_concern') })) }, { name: 'Service', color: dash.colors[1], points: S.map((x) => ({ d: x.d, v: x.pct('service_concern') })) }]; if (!isNet) ser.push({ name: 'Net product', muted: true, points: SN.map((x) => ({ d: x.d, v: x.pct('product_concern') })) }, { name: 'Net service', muted: true, dashed: true, points: SN.map((x) => ({ d: x.d, v: x.pct('service_concern') })) }); C.line($('c-concern-line'), ser, { fmt: F.pct, y0: true }); }
     const L1 = [['QUALITY_ISSUES', 'Quality', 'l1_quality'], ['QUANTITY_ISSUES', 'Quantity', 'l1_quantity'], ['Packaging_issues', 'Packaging', 'l1_packaging'], ['MISSING_ITEMS', 'Missing', 'l1_missing'], ['WRONG_ITEMS', 'Wrong', 'l1_wrong']];
-    const orders = row ? row.orders : 0;
-    const l1rows = L1.map(([k, l, f]) => { const c = d3.sum(W, (w) => w.s[f] || 0); return { label: l, key: k, value: orders ? (100 * c) / orders : 0, sub: `${F.int(c)} orders`, color: state.l1 === k ? dash.colors[0] : state.l1 ? 'var(--cds-chart-muted)' : dash.colors[0] }; }).sort((a, b) => b.value - a.value);
+    // L1, L2 and items are shares of concern orders. L1 and L2 share one base and follow every filter (daily data);
+    // items take all data, as that feed has no dates.
+    const concernBase = row ? row.complaints : 0;
+    const wk = inWeeks(p, end);
+    const itemsBase = cached('items-base', [daily, restaurants, info.selKey, dataEnd], () => d3.sum(daily, (r) => (ids.has(r.restaurant_id) && dayNum(r.day) > dataEnd - 84 ? N(r.complaint_orders) : 0)));
+    const l1rows = L1.map(([k, l, f]) => { const c = d3.sum(W, (w) => w.s[f] || 0); return { label: l, key: k, value: concernBase ? (100 * c) / concernBase : 0, sub: `${F.int(c)} orders`, color: state.l1 === k ? dash.colors[0] : state.l1 ? 'var(--cds-chart-muted)' : dash.colors[0] }; }).sort((a, b) => b.value - a.value);
     if (vis('c-l1')) C.ranked($('c-l1'), l1rows, { fmt: F.pct, active: state.l1 ? L1.find((x) => x[0] === state.l1)[1] : null, onClick: (d) => { state.l1 = state.l1 === d.key ? null : d.key; redraw(); } });
     const l1Label = state.l1 ? L1.find((x) => x[0] === state.l1)[1] : null;
-    $('l2-sub').textContent = (l1Label ? 'within ' + l1Label : 'all L1') + ' · weekly feed, all days';
-    $('items-sub').textContent = l1Label ? 'within ' + l1Label : 'all L1';
-    const wk = inWeeks(p, end);
-    const comp = rows('complaints').filter((r) => ids.has(r.restaurant_id) && wk(dayNum(r.week)) && (!state.l1 || r.l1 === state.l1));
-    if (vis('c-l2')) { const m = d3.rollups(comp, (v) => d3.sum(v, (r) => N(r.orders)), (r) => r.l2).sort((a, b) => b[1] - a[1]).slice(0, 12); C.ranked($('c-l2'), m.map(([l, c]) => ({ label: l, value: orders ? (100 * c) / orders : 0, sub: `${F.int(c)}` })), { fmt: F.pct }); }
+    const within = l1Label ? `within ${l1Label} · ` : '';
+    $('l1-sub').textContent = `% of ${F.int(concernBase)} concern orders · click to drill`;
+    $('l2-sub').textContent = `${within}% of ${F.int(concernBase)} concern orders`;
+    $('items-sub').textContent = `${within}% of ${F.int(itemsBase)} concern orders · all data`;
+    $('crit-sub').textContent = `count · % of ${F.int(row ? row.orders : 0)} total orders`;
+    const comp = rows('l2_daily').filter((r) => { const d = dayNum(r.day); return ids.has(r.restaurant_id) && inDaytype(r, p.daytype) && d >= p.start && d <= p.end && (!state.l1 || r.l1 === state.l1); });
+    if (vis('c-l2')) { const m = d3.rollups(comp, (v) => d3.sum(v, (r) => N(r.orders)), (r) => r.l2).sort((a, b) => b[1] - a[1]).slice(0, 12); C.ranked($('c-l2'), m.map(([l, c]) => ({ label: l, value: concernBase ? (100 * c) / concernBase : 0, sub: `${F.int(c)} orders` })), { fmt: F.pct }); }
     const items = rows('item_issues').filter((r) => ids.has(r.restaurant_id));
     if (vis('c-items')) {
       const keyF = state.itemsMode === 'category' ? (r) => r.menu_category : (r) => r.item;
-      const tot = d3.rollup(items, (v) => d3.sum(v, (r) => N(r.orders)), keyF);
       const selI = items.filter((r) => !state.l1 || r.l1 === state.l1);
       const m = d3.rollups(selI, (v) => d3.sum(v, (r) => N(r.orders)), keyF).sort((a, b) => b[1] - a[1]).slice(0, 10);
-      const all = d3.sum(selI, (r) => N(r.orders));
-      C.ranked($('c-items'), m.map(([l, c]) => ({ label: l, value: c, sub: state.l1 ? `${d3.format('.0%')(c / (tot.get(l) || 1))} of its complaints` : `${d3.format('.1%')(c / (all || 1))} of all` })), { fmt: F.int });
-      $('items-note').textContent = state.itemsMode === 'category' ? 'menu category from a placeholder column — needs the item master' : state.l1 ? 'share = complaints in this L1 ÷ all complaints on the item' : 'share = complaints on item ÷ all complaints';
+      C.ranked($('c-items'), m.map(([l, c]) => ({ label: l, value: c, sub: d3.format('.1%')(c / (itemsBase || 1)) })), { fmt: F.int });
+      $('items-note').textContent = state.itemsMode === 'category' ? 'menu category from a placeholder column — needs the item master' : 'count = concern orders on the item · an order with two items counts under each';
     }
     if (vis('c-concern-weekly')) C.stackedWeekly($('c-concern-weekly'), W.map((w) => ({ d: w.d, parts: { product: w.s.product_concern, service: w.s.service_concern } })), [{ key: 'product', label: 'Product', color: dash.colors[0] }, { key: 'service', label: 'Service', color: dash.colors[1] }]);
 

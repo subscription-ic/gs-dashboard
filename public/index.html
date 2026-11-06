@@ -74,7 +74,7 @@
       <div class="lb-head">
         <span>#</span><span>Outlet</span>
         <button type="button" data-sort="rating">Rating</button>
-        <button type="button" data-sort="complaint_pct" class="hide-sm">Concerns %</button>
+        <button type="button" data-sort="complaint_pct" class="hide-sm" title="Concern orders ÷ total orders">Concerns %</button>
         <button type="button" data-sort="kpt" class="hide-sm">KPT</button>
         <button type="button" data-sort="mfr_correct_pct" class="hide-sm">Correct MFR</button>
         <button type="button" data-sort="vis_pct" class="hide-sm">Visibility</button>
@@ -166,14 +166,14 @@
       <button type="button" class="grp-head" aria-expanded="true"><span class="grp-name">Concerns<small>IGCC complaint orders</small></span><span class="grp-sum" id="sum-concerns"></span><span class="grp-avail" id="avail-concerns"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
       <div class="grp-body">
         <div class="ops-grid">
-          <div class="ops-card"><h3>Category concern % <span class="n">of Swiggy orders</span></h3><div class="ops-tiles" id="t-concerns"></div></div>
-          <div class="ops-card"><h3>Product vs service <span class="n">share of complaint orders</span></h3><div class="ops-chart auto" id="c-concern-donut" data-source="kpis"></div></div>
-          <div class="ops-card"><h3>Concerns per review</h3><div class="ops-chart short" id="c-concern-split" data-source="kpis"></div><div class="ops-tiles compact" id="t-concern-count"></div></div>
-          <div class="ops-card wide"><h3>Product and service concern % per day <span class="n">7-day rolling vs network</span></h3><div class="ops-chart" id="c-concern-line" data-source="daily"></div></div>
-          <div class="ops-card"><h3>L1 issues <span class="n">% of orders · click to drill</span></h3><div class="ops-chart auto" id="c-l1" data-source="daily"></div></div>
-          <div class="ops-card"><h3 id="l2-title">L2 issues <span class="n" id="l2-sub">all L1 · weekly feed, all days</span></h3><div class="ops-chart auto" id="c-l2" data-source="complaints"></div></div>
-          <div class="ops-card"><h3>Items complained about <span class="n" id="items-sub">all L1</span></h3><div class="ops-inline"><span class="ops-chip" data-items="same" aria-pressed="true">By item</span><span class="ops-chip" data-items="category" aria-pressed="false">By menu category</span><span id="items-note">share = complaints ÷ all complaints on that item</span></div><div class="ops-chart auto" id="c-items" data-source="item_issues"></div></div>
-          <div class="ops-card"><h3>Product vs service per week</h3><div class="ops-chart" id="c-concern-weekly" data-source="daily"></div></div>
+          <div class="ops-card"><h3>Category concern % <span class="n">of total orders</span></h3><div class="ops-tiles" id="t-concerns"></div></div>
+          <div class="ops-card"><h3>Product vs service <span class="n">share of concern orders</span></h3><div class="ops-chart auto" id="c-concern-donut" data-source="kpis"></div></div>
+          <div class="ops-card"><h3>Concern types per order <span class="n">concern orders</span></h3><div class="ops-chart short" id="c-concern-split" data-source="kpis"></div><div class="ops-tiles compact" id="t-concern-count"></div></div>
+          <div class="ops-card wide"><h3>Product and service concern % per day <span class="n">% of total orders · 7-day rolling vs network</span></h3><div class="ops-chart" id="c-concern-line" data-source="daily"></div></div>
+          <div class="ops-card"><h3>L1 issues <span class="n" id="l1-sub" title="An order raised under two L1 types counts in each, so these can add up to just over 100%">% of concern orders · click to drill</span></h3><div class="ops-chart auto" id="c-l1" data-source="daily"></div></div>
+          <div class="ops-card"><h3 id="l2-title">L2 issues <span class="n" id="l2-sub">all L1</span></h3><div class="ops-chart auto" id="c-l2" data-source="l2_daily"></div></div>
+          <div class="ops-card"><h3>Items complained about <span class="n" id="items-sub">all L1</span></h3><div class="ops-inline"><span class="ops-chip" data-items="same" aria-pressed="true">By item</span><span class="ops-chip" data-items="category" aria-pressed="false">By menu category</span><span id="items-note">count = concern orders on the item · an order with two items counts under each</span></div><div class="ops-chart auto" id="c-items" data-source="item_issues"></div></div>
+          <div class="ops-card"><h3>Product vs service per week <span class="n">concern orders</span></h3><div class="ops-chart" id="c-concern-weekly" data-source="daily"></div></div>
         </div>
         <div class="ops-na" id="na-concerns"></div>
       </div>
@@ -183,10 +183,10 @@
       <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">Critical concerns<small>Veg/non-veg · foreign particle · pests</small></span><span class="grp-sum" id="sum-critical"></span><span class="grp-avail" id="avail-critical"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
       <div class="grp-body">
         <div class="ops-grid">
-          <div class="ops-card"><h3>Critical incidents <span class="n">count · % of orders</span></h3><div class="ops-crit" id="t-critical"></div><p class="ops-note">Keyword-classified from L1/L2 and comments. 'Contaminated Food' L2 is counted as foreign particle pending your decision.</p></div>
+          <div class="ops-card"><h3>Critical incidents <span class="n" id="crit-sub">count · % of total orders</span></h3><div class="ops-crit" id="t-critical"></div><p class="ops-note">Keyword-classified from L1/L2 and comments. 'Contaminated Food' L2 is counted as foreign particle pending your decision.</p></div>
           <div class="ops-card"><h3>Share of all critical concerns</h3><div class="ops-chart auto" id="c-crit-donut" data-source="kpis"></div></div>
           <div class="ops-card wide"><h3>Critical incidents per week</h3><div class="ops-chart" id="c-crit-weekly" data-source="daily"></div></div>
-          <div class="ops-card wide"><h3>Items with critical concerns <span class="n">by item · weekly feed</span></h3><div class="ops-chart auto" id="c-crit-items" data-source="item_issues"></div></div>
+          <div class="ops-card wide"><h3>Items with critical concerns <span class="n">critical concern orders · all data</span></h3><div class="ops-chart auto" id="c-crit-items" data-source="item_issues"></div></div>
         </div>
         <div class="ops-na" id="na-critical"></div>
       </div>

@@ -58,7 +58,8 @@ Open http://localhost:3000. "↻ Reload data" re-queries SQL (the server caches 
 |---|---|---|
 | `daily` | Swiggy timestamps, online hours, rating, IGCC, RDC | every tile, delta vs prior period, daily and weekly trends, KPT buckets, visibility, MFR/handover, TAT, concerns, critical, refunds |
 | `hourly` | Swiggy timestamps | hour × weekday heatmap, day-part and peak/off-peak cuts for KPT, MFR, handover |
-| `complaints` | IGCC | L2 drill-down, refund by reason, weekly concern mix |
+| `complaints` | IGCC | Refund by reason, weekly concern mix |
+| `l2_daily` | IGCC | L2 issues card: daily L1 × L2 counts, on the same base as L1 |
 | `cancellations` | RDC | reason %, cancelled-by, OOS proxy, weekly mix, top reason |
 | `item_issues` | IGCC item column | item-wise lists (same item / menu category), critical items |
 | `item_cancels` | RDC + order items | product-wise cancellation |

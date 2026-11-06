@@ -28,6 +28,14 @@ module.exports = {
     sql: `SELECT restaurant_id, CONVERT(varchar(10), [week], 23) AS [week], l1, l2, orders, refund_amt, critical_type
           FROM ${S}.vw_ops_complaints ORDER BY restaurant_id, [week], l1, l2`,
   },
+  l2_daily: {
+    title: 'IGCC complaints by L1/L2 per day',
+    sql: `SELECT restaurant_id, CONVERT(varchar(10), concern_date, 23) AS [day],
+            CASE WHEN DATEDIFF(DAY, '19000101', concern_date) % 7 >= 5 THEN 1 ELSE 0 END AS is_weekend,
+            l1, l2, COUNT(DISTINCT order_id) AS orders
+          FROM ${S}.vw_ops_complaint_lines
+          GROUP BY restaurant_id, concern_date, l1, l2 ORDER BY restaurant_id, concern_date, l1, l2`,
+  },
   cancellations: {
     title: 'RDC cancellations by reason per week',
     sql: `SELECT restaurant_id, CONVERT(varchar(10), [week], 23) AS [week], reason, cancel_group, orders, value

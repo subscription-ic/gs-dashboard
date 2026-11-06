@@ -104,6 +104,7 @@
 .grp-avail { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); white-space: nowrap; }
 .grp-chev { width: 18px; height: 18px; color: var(--color-fg-muted); transition: transform var(--cds-dur-slow) var(--cds-ease-out); }
 .grp[data-open="1"] .grp-chev { transform: rotate(180deg); }
+.ops-kpi .b { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); font-weight: 400; }
 .ops-legend { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: var(--cds-gap-xs); font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
 .ops-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; }
 /* a chart card that stays closed until the viewer opens it */
