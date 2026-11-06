@@ -199,7 +199,7 @@
           <div class="ops-card"><h3>Cancelled and completed</h3><div class="ops-tiles" id="t-cancel"></div></div>
           <div class="ops-card"><h3>Reason % <span class="n">of cancellations · weekly feed</span></h3><div class="ops-chart auto" id="c-cancel-reasons" data-source="cancellations"></div><p class="ops-note">'Item unavailable' doubles as the out-of-stock proxy until the Swiggy OOS report is loaded.</p></div>
           <div class="ops-card"><h3>Cancelled by</h3><div class="ops-chart auto" id="c-cancel-donut" data-source="cancellations"></div></div>
-          <div class="ops-card wide"><h3>Cancelled % per day <span class="n">7-day rolling vs network</span></h3><div class="ops-chart" id="c-cancel-line" data-source="daily"></div></div>
+          <details class="ops-card wide ops-fold"><summary><h3>Cancelled % per day <span class="n">7-day rolling vs network</span></h3><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></summary><div class="ops-chart" id="c-cancel-line" data-source="daily"></div></details>
           <div class="ops-card"><h3>Cancellations by group per week</h3><div class="ops-chart" id="c-cancel-weekly" data-source="cancellations"></div></div>
           <div class="ops-card"><h3>Items in cancelled orders <span class="n">count · share</span></h3><div class="ops-chart auto" id="c-cancel-items" data-source="item_cancels"></div></div>
         </div>
@@ -213,7 +213,7 @@
         <div class="ops-grid">
           <div class="ops-card"><h3>Cancelled order value</h3><div class="ops-tiles" id="t-saleloss"></div><p class="ops-note">Absolute ₹ only — % of sales needs total GMV from the payout file.</p></div>
           <div class="ops-card"><h3>Sale loss ₹ by reason <span class="n">cancelled value · red = out of stock · weekly feed</span></h3><div class="ops-chart auto" id="c-saleloss-reasons" data-source="cancellations"></div></div>
-          <div class="ops-card wide"><h3>Cancelled value per day <span class="n">₹</span></h3><div class="ops-chart" id="c-saleloss-line" data-source="daily"></div></div>
+          <details class="ops-card wide ops-fold"><summary><h3>Cancelled value per day <span class="n">₹</span></h3><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></summary><div class="ops-chart" id="c-saleloss-line" data-source="daily"></div></details>
         </div>
         <div class="ops-na" id="na-saleloss"></div>
       </div>

@@ -400,6 +400,7 @@
   $('ideal-tat').addEventListener('change', (e) => { const v = +e.target.value; if (v > 0) { state.ideal = v; redraw(); } });
   document.querySelectorAll('[data-items]').forEach((c) => c.addEventListener('click', () => { state.itemsMode = c.dataset.items; redraw(); }));
   document.querySelectorAll('.grp-head').forEach((b) => b.addEventListener('click', () => { const g = b.closest('.grp'); const open = g.dataset.open !== '1'; g.dataset.open = open ? '1' : '0'; b.setAttribute('aria-expanded', open); if (open) redraw(); }));
+  document.querySelectorAll('.ops-fold').forEach((d) => d.addEventListener('toggle', () => { if (d.open) redraw(); }));
   /* tabs: one panel on screen at a time; the URL hash keeps the tab across reloads. Charts in hidden panels are skipped
      by vis() in draw(), so switching redraws the panel that just appeared. */
   function setTab(t) {
@@ -553,7 +554,7 @@
     const S = dailySeries(daily, ids, p, end), SN = dailySeries(daily, allIds, p, end), isNet = !info.any;
     const name = info.name;
     const W = weekly(daily, ids, p, end);
-    const vis = (id) => { const el = $(id); if (!el) return false; const g = el.closest('.grp'); if (g && g.dataset.open !== '1') return false; return el.clientWidth > 0; };
+    const vis = (id) => { const el = $(id); if (!el) return false; const g = el.closest('.grp'); if (g && g.dataset.open !== '1') return false; const fold = el.closest('.ops-fold'); if (fold && !fold.open) return false; return el.clientWidth > 0; };
     const pair = (key, kind) => { const val = (x) => (kind === 'w' ? x.w(key) : kind === 'pct' ? x.pct(key) : x[kind]); const ser = [{ name, color: dash.colors[0], points: S.map((x) => ({ d: x.d, v: val(x) })) }]; if (!isNet) ser.push({ name: 'Network', muted: true, points: SN.map((x) => ({ d: x.d, v: val(x) })) }); return ser; };
     const weekendDays = S.filter((x) => x.d.getUTCDay() === 0 || x.d.getUTCDay() === 6).map((x) => x.d);
 

@@ -104,6 +104,13 @@
 .grp-avail { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); white-space: nowrap; }
 .grp-chev { width: 18px; height: 18px; color: var(--color-fg-muted); transition: transform var(--cds-dur-slow) var(--cds-ease-out); }
 .grp[data-open="1"] .grp-chev { transform: rotate(180deg); }
+/* a chart card that stays closed until the viewer opens it */
+.ops-fold summary { display: flex; align-items: center; gap: var(--cds-gap-sm); cursor: pointer; list-style: none; }
+.ops-fold summary::-webkit-details-marker { display: none; }
+.ops-fold summary h3 { flex: 1; min-width: 0; }
+.ops-fold[open] summary { margin-bottom: var(--cds-gap-sm); }
+.ops-fold .grp-chev, .grp[data-open="1"] .ops-fold .grp-chev { flex: none; transform: none; }
+.ops-fold[open] .grp-chev, .grp[data-open="1"] .ops-fold[open] .grp-chev { transform: rotate(180deg); }
 .grp-body { display: none; padding: 0 var(--cds-pad-lg) var(--cds-pad-lg); flex-direction: column; gap: var(--cds-gap-md); }
 .grp[data-open="1"] .grp-body { display: flex; }
 .grp-body > .ops-grid > .ops-card { background: var(--color-bg); }
