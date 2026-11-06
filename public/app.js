@@ -610,7 +610,7 @@
       const KINDS = [['crit_veg', 'Veg / non-veg', 'veg / non-veg', dash.colors[3]], ['crit_foreign', 'Foreign particle', 'foreign', dash.colors[4]], ['crit_pests', 'Pests', 'pests', dash.colors[5]]];
       const crit = items.filter((r) => N(r.critical_orders) > 0), split = crit.some((r) => r.crit_veg != null);
       const m = d3.rollups(crit, (v) => { const parts = KINDS.map(([f, label, short, color]) => ({ label, short, color, value: d3.sum(v, (r) => N(r[f])) })).filter((x) => x.value > 0); return { parts, total: split ? d3.sum(parts, (x) => x.value) : d3.sum(v, (r) => N(r.critical_orders)) }; }, (r) => r.item).sort((a, b) => b[1].total - a[1].total).slice(0, 8);
-      C.ranked($('c-crit-items'), m.map(([l, e]) => (split ? { label: l, value: e.total, parts: e.parts, sub: e.parts.map((x) => `${F.int(x.value)} ${x.short}`).join(' · ') } : { label: l, value: e.total, color: 'var(--cds-chart-status-critical)' })), { fmt: F.int, legend: split ? KINDS.map(([, label, , color]) => ({ label, color })) : null });
+      C.ranked($('c-crit-items'), m.map(([l, e]) => (split ? { label: l, value: e.total, parts: e.parts, sub: e.parts.map((x) => `${F.int(x.value)} ${x.value === 1 && x.short === 'pests' ? 'pest' : x.short}`).join(' · ') } : { label: l, value: e.total, color: 'var(--cds-chart-status-critical)' })), { fmt: F.int, legend: split ? KINDS.map(([, label, , color]) => ({ label, color })) : null });
     }
 
     // ---- Output: cancellation

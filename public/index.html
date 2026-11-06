@@ -196,8 +196,8 @@
       <button type="button" class="grp-head" aria-expanded="false"><span class="grp-name">RDC cancellation<small>Restaurant-side cancellations</small></span><span class="grp-sum" id="sum-cancel"></span><span class="grp-avail" id="avail-cancel"></span><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></button>
       <div class="grp-body">
         <div class="ops-grid">
-          <div class="ops-card"><h3>Cancelled by</h3><div class="ops-chart auto" id="c-cancel-donut" data-source="cancellations"></div></div>
           <div class="ops-card"><h3>Cancelled and completed</h3><div class="ops-tiles" id="t-cancel"></div></div>
+          <div class="ops-card"><h3>Cancelled by</h3><div class="ops-chart auto" id="c-cancel-donut" data-source="cancellations"></div></div>
           <div class="ops-card"><h3>Reason % <span class="n">of cancellations · weekly feed</span></h3><div class="ops-chart auto" id="c-cancel-reasons" data-source="cancellations"></div><p class="ops-note">'Item unavailable' doubles as the out-of-stock proxy until the Swiggy OOS report is loaded.</p></div>
           <details class="ops-card wide ops-fold"><summary><h3>Cancelled % per day <span class="n">7-day rolling vs network</span></h3><svg class="grp-chev" viewBox="0 0 16 16"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg></summary><div class="ops-chart" id="c-cancel-line" data-source="daily"></div></details>
           <div class="ops-card"><h3>Cancellations by group per week</h3><div class="ops-chart" id="c-cancel-weekly" data-source="cancellations"></div></div>

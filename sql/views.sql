@@ -256,7 +256,10 @@ SELECT l.restaurant_id, l.item,
   l.l1,
   COUNT(DISTINCT l.order_id) AS orders,
   COUNT(DISTINCT CASE WHEN l.critical_type <> '' THEN l.order_id END) AS critical_orders,
-  MAX(pi.item_orders) AS item_orders                               -- = all complaints on that item (denominator for "same item %")
+  COUNT(DISTINCT CASE WHEN l.critical_type = 'Veg/Non-veg'      THEN l.order_id END) AS crit_veg,
+  COUNT(DISTINCT CASE WHEN l.critical_type = 'Foreign particle' THEN l.order_id END) AS crit_foreign,
+  COUNT(DISTINCT CASE WHEN l.critical_type = 'Pests'            THEN l.order_id END) AS crit_pests,
+  MAX(pi.item_orders) AS item_orders                              -- = all complaints on that item (denominator for "same item %")
 FROM lines l
 JOIN per_item pi ON pi.restaurant_id = l.restaurant_id AND pi.item = l.item
 GROUP BY l.restaurant_id, l.item, l.l1;
@@ -264,9 +267,17 @@ GO
 
 /* ---------- 8. items in cancelled orders (trailing 84 days of data) ---------- */
 CREATE OR ALTER VIEW dbo.vw_ops_item_cancels AS
-SELECT CAST(restaurant_id AS varchar(20)) AS restaurant_id, item, 'Uncategorised' AS menu_category, COUNT(DISTINCT order_id) AS orders
-FROM dbo.fact_cancellation_items
-WHERE item IS NOT NULL AND cancel_date > DATEADD(DAY, -84, (SELECT max_day FROM dbo.vw_ops_bounds))
-  AND cancel_date <= (SELECT max_day FROM dbo.vw_ops_bounds)
-GROUP BY restaurant_id, item;
+WITH c AS (
+  SELECT CAST(restaurant_id AS varchar(20)) AS restaurant_id, item, order_id,
+    CASE WHEN cancel_l2 IN ('RDC_RCC', 'RDC_OOS') THEN cancel_l2      -- same groups as vw_ops_cancellations
+         WHEN cancel_l2 = 'RDC_FXM' THEN 'FXM'
+         WHEN cancel_l2 LIKE '%Tech%' THEN 'Tech'
+         ELSE 'Other' END AS cancel_group
+  FROM dbo.fact_cancellation_items
+  WHERE item IS NOT NULL AND cancel_date > DATEADD(DAY, -84, (SELECT max_day FROM dbo.vw_ops_bounds))
+    AND cancel_date <= (SELECT max_day FROM dbo.vw_ops_bounds)
+)
+SELECT restaurant_id, item, 'Uncategorised' AS menu_category, cancel_group, COUNT(DISTINCT order_id) AS orders
+FROM c
+GROUP BY restaurant_id, item, cancel_group;
 GO

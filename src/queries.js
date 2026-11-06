@@ -35,11 +35,11 @@ module.exports = {
   },
   item_issues: {
     title: 'Item-wise complaints',
-    sql: `SELECT restaurant_id, item, menu_category, l1, orders, critical_orders, item_orders
+    sql: `SELECT restaurant_id, item, menu_category, l1, orders, critical_orders, crit_veg, crit_foreign, crit_pests, item_orders
           FROM ${S}.vw_ops_item_issues ORDER BY restaurant_id, item, l1`,
   },
   item_cancels: {
     title: 'Items in cancelled orders',
-    sql: `SELECT restaurant_id, item, menu_category, orders FROM ${S}.vw_ops_item_cancels ORDER BY restaurant_id, item`,
+    sql: `SELECT restaurant_id, item, menu_category, cancel_group, orders FROM ${S}.vw_ops_item_cancels ORDER BY restaurant_id, item`,
   },
 };

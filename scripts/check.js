@@ -9,8 +9,8 @@ const EXPECTED = {
   hourly: ['restaurant_id', 'weekday', 'hour', 'orders', 'kpt_avg', 'correct_mfr_pct', 'handover_avg', 'mfr_not_marked_pct'],
   complaints: ['restaurant_id', 'week', 'l1', 'l2', 'orders', 'refund_amt', 'critical_type'],
   cancellations: ['restaurant_id', 'week', 'reason', 'cancel_group', 'orders', 'value'],
-  item_issues: ['restaurant_id', 'item', 'menu_category', 'l1', 'orders', 'critical_orders', 'item_orders'],
-  item_cancels: ['restaurant_id', 'item', 'menu_category', 'orders'],
+  item_issues: ['restaurant_id', 'item', 'menu_category', 'l1', 'orders', 'critical_orders', 'crit_veg', 'crit_foreign', 'crit_pests', 'item_orders'],
+  item_cancels: ['restaurant_id', 'item', 'menu_category', 'cancel_group', 'orders'],
 };
 
 (async () => {
