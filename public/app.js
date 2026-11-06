@@ -284,7 +284,7 @@
   ]);
   tiles('chain-outcome-kpis', [
     { label: 'Rating', field: 'rating', fmt: 'rating', big: true, stars: true }, { label: 'Ratings', field: 'rating_n', fmt: 'int', nostatus: true },
-    { label: 'ADT', field: 'adt', fmt: 'num1', nostatus: true, tip: () => 'Average daily transactions: delivered orders per outlet per selling day' }, { label: 'ADS (est.)', field: 'ads', fmt: 'inr', nostatus: true, tip: () => 'Average daily sales per outlet: ADT × average order value (estimate — no sales feed yet)' },
+    { label: 'ADT (Swiggy)', field: 'adt', fmt: 'num1', nostatus: true, tip: () => 'Average daily transactions on Swiggy: delivered orders per outlet per selling day' }, { label: 'ADS (Swiggy, est.)', field: 'ads', fmt: 'inr', nostatus: true, tip: () => 'Average daily sales on Swiggy per outlet: ADT × average order value (estimate — no sales feed yet)' },
     { label: 'Total sale loss', field: 'guest_value', fmt: 'inr', nostatus: true, tip: () => 'Refunds + cancelled order value' },
   ]);
   // Group summaries (compact, no delta)
@@ -295,7 +295,7 @@
     critical: [{ label: 'Incidents', field: 'crit_total', fmt: 'int' }],
     cancel: [{ label: 'Cancelled', field: 'cancel_pct', fmt: 'pct' }, { label: 'Completion', field: 'completion_pct', fmt: 'pct' }],
     refund: [{ label: 'Refunded ₹', field: 'refund', fmt: 'inr', nostatus: true }],
-    sales: [{ label: 'ADT', field: 'adt', fmt: 'num1', nostatus: true }, { label: 'ADS (est.)', field: 'ads', fmt: 'inr', nostatus: true }],
+    sales: [{ label: 'ADT (Swiggy)', field: 'adt', fmt: 'num1', nostatus: true }, { label: 'ADS (Swiggy, est.)', field: 'ads', fmt: 'inr', nostatus: true }],
     kpt: [{ label: 'KPT', field: 'kpt', fmt: 'min' }, { label: 'Peak', field: 'kpt_peak', fmt: 'min' }, { label: '> 10 min', field: 'kpt_gt10_pct', fmt: 'pct' }, { label: 'Order → pickup', field: 'tat', fmt: 'min' }],
     vis: [{ label: 'Visibility', field: 'vis_pct', fmt: 'pct' }, { label: 'Non-op days / outlet', field: 'nonop_days', fmt: 'days' }],
     mfr: [{ label: 'Correct MFR', field: 'mfr_correct_pct', fmt: 'pct' }, { label: 'Handover', field: 'handover', fmt: 'min' }, { label: 'Rider waited for food', field: 'wait_arr_pct', fmt: 'pct' }],
@@ -313,7 +313,7 @@
   tiles('t-cancel', [{ label: 'Cancelled %', field: 'cancel_pct', fmt: 'pct', big: true, base: ofOrders('cancelled') }, { label: 'Order completion', field: 'completion_pct', fmt: 'pct' }, { label: 'Cancelled orders', field: 'cancelled', fmt: 'int', nostatus: true, delta: false }, { label: 'Top reason', field: 'pct', fmt: 'pct', source: 'cancel_mix', level: 'reason', name: '', nostatus: true, delta: false, top: true }]);
   tiles('t-refund', [{ label: 'Total refunded (IGCC)', field: 'refund', fmt: 'inr', big: true, nostatus: true }, { label: 'Complaint orders', field: 'complaints', fmt: 'int', nostatus: true, delta: false }]);
   tiles('t-tat', [{ label: 'Average order → pickup', field: 'tat', fmt: 'min', big: true }]);
-  tiles('t-sales', [{ label: 'ADT · orders per outlet a day', field: 'adt', fmt: 'num1', big: true, nostatus: true }, { label: 'ADS (est.) · ₹ per outlet a day', field: 'ads', fmt: 'inr', big: true, nostatus: true }, { label: 'Orders', field: 'orders', fmt: 'int', nostatus: true, delta: false }, { label: 'Selling outlet-days', field: 'sell_days', fmt: 'int', nostatus: true, delta: false }]);
+  tiles('t-sales', [{ label: 'ADT (Swiggy) · orders per outlet a day', field: 'adt', fmt: 'num1', big: true, nostatus: true }, { label: 'ADS (Swiggy, est.) · ₹ per outlet a day', field: 'ads', fmt: 'inr', big: true, nostatus: true }, { label: 'Orders', field: 'orders', fmt: 'int', nostatus: true, delta: false }, { label: 'Selling outlet-days', field: 'sell_days', fmt: 'int', nostatus: true, delta: false }]);
   tiles('t-kpt', [{ label: 'Average KPT', field: 'kpt', fmt: 'min', big: true }, { label: 'Peak hours', field: 'kpt_peak', fmt: 'min' }, { label: 'Off-peak', field: 'kpt_offpeak', fmt: 'min' }, { label: 'Orders over 10 min', field: 'kpt_gt10_pct', fmt: 'pct' }]);
   // tip: one-line explanation shown on hover, built from the row so it carries the live numbers
   const n = (v) => d3.format(',')(Math.round(v || 0));
@@ -350,7 +350,7 @@
     critical: [['Critical concerns per item sold', 'Needs total items sold per item from Swiggy'], ['Multiple critical per order', 'Needs order-level complaint rows'], ['Items by menu category', 'Needs item master']],
     cancel: [['Cancelled before / after MFR', 'Cancelled orders have no timestamp row'], ['Avg cancellation time per reason', 'RDC has date only, no cancellation timestamp']],
     refund: [['Refund greater than bill', 'IGCC has no order / bill value'], ['Net refund', 'Depends on the row above']],
-    sales: [['Actual ADS', 'Needs the sales value of delivered orders (payout file)']],
+    sales: [['Actual Swiggy ADS', 'Needs the sales value of delivered orders (payout file)']],
     kpt: [['Items sold by KPT bucket', 'No item lines for completed orders'], ['Items per order', 'No item lines for completed orders'], ['Order → delivered', 'Delivered time exists only for complaint orders']],
     vis: [['Live (real-time) online status', 'Feed is daily — the latest day is shown instead'], ['Online hours by day part', 'Feed is daily — day parts use stores taking orders instead']],
     agg: [['Rider assignment / arrival delay reason', 'Not in the Swiggy feeds']],
@@ -689,7 +689,7 @@
 
   /* ---------- leaderboard ---------- */
   const LBT = {
-    outcome: [['rating', 'Rating', 'rating'], ['adt', 'ADT', 'num1'], ['ads', 'ADS (est.)', 'inr'], ['rating_n', '# ratings', 'int'], ['guest_value', 'Total sale loss ₹', 'inr']],
+    outcome: [['rating', 'Rating', 'rating'], ['adt', 'ADT (Swiggy)', 'num1'], ['ads', 'ADS (Swiggy, est.)', 'inr'], ['rating_n', '# ratings', 'int'], ['guest_value', 'Total sale loss ₹', 'inr']],
     output: [['complaint_pct', 'Total concerns', 'pct'], ['product_pct', 'Product concern', 'pct'], ['service_pct', 'Service concern', 'pct'], ['crit_total', 'Critical incidents', 'int'], ['cancel_pct', 'Cancelled', 'pct'], ['sale_loss', 'Sale loss (cancelled ₹)', 'inr'], ['refund', 'Refunds ₹', 'inr']],
     input: [['kpt', 'KPT', 'min'], ['kpt_peak', 'Peak KPT', 'min'], ['kpt_gt10_pct', 'Orders > 10 min', 'pct'], ['vis_pct', 'Visibility', 'pct'], ['mfr_correct_pct', 'Correct MFR', 'pct'], ['handover', 'Handover', 'min'], ['wait_arr_pct', 'Rider waited for food', 'pct'], ['tat', 'Order → pickup', 'min']],
   };

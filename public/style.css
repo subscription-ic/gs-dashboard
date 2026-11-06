@@ -1,5 +1,5 @@
 /* Restaurant Ops Diagnostics — page styles. Tokens come from the dashboard theme. */
-.ops { font-family: var(--font-anthropic-sans); color: var(--color-fg); font-variant-numeric: tabular-nums; max-width: 1280px; margin-inline: auto; display: flex; flex-direction: column; gap: var(--cds-gap-lg); }
+.ops { font-family: var(--font-anthropic-sans); color: var(--color-fg); font-variant-numeric: tabular-nums; max-width: 1920px; margin-inline: auto; display: flex; flex-direction: column; gap: var(--cds-gap-lg); }
 .ops * { box-sizing: border-box; }
 .ops [data-dash-source-state=empty] { color: transparent; }
 .ops [data-dash-source-state=refreshing] { opacity: .5; transition: opacity var(--cds-dur-slow); }
@@ -300,6 +300,14 @@
    the summary strip in a group header stays a step smaller */
 .ops-kpi .v, .ops-kpi .v.sm, .ops-tiles .ops-kpi .v, .ops-tiles.compact .ops-kpi .v { font-size: 1.3rem; }
 .grp-sum .ops-kpi .v { font-size: 1.1rem; }
+/* Overview cards: two roomy columns of figures; text under the heading 5% smaller than the rest of the page */
+.ops-chain-col { --cds-font-size-caption: 0.741rem; }
+.ops-chain-col .ops-kpi .v, .ops-chain-col .ops-kpi .v.sm { font-size: 1.235rem; }
+.ops-chain-col .ops-tag { font-size: 0.646rem; }
+.ops-chain-col .ops-stars { font-size: 0.83125rem; }
+.ops-chain-col .ops-kpi .d { white-space: normal; }
+.ops-chain-col .ops-kpis { grid-template-columns: repeat(auto-fit, minmax(min(100%, max(7.5rem, 34%)), 1fr)); gap: var(--cds-gap-lg) var(--cds-gap-md); }   /* at most two columns */
+@media (min-width: 761px) { .ops-chain-arrow { width: 56px; } }
 /* leaderboard: wider outlet column so long names stay on one line (desktop only; phones keep their own layout) */
 @media (min-width: 761px) {
   .lb-head, .lb-row { grid-template-columns: 2rem minmax(11rem, 2fr) minmax(8rem, 1fr) repeat(5, minmax(3.75rem, .55fr)) minmax(10rem, 1.8fr) 1.5rem; }
