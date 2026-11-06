@@ -106,27 +106,39 @@
 
   /* Horizontal ranked bars: rows [{label, value, sub?, color?}], opts {fmt, h?, onClick, active} */
   C.ranked = function (el, rows, opts = {}) {
-    const rowH = opts.rowH || 26, n = rows.length;
-    const h = Math.max(40, n * rowH + 6);
-    const { svg, w } = svgIn(el, h);
+    const rowH = opts.rowH || 26, n = rows.length, lineH = 15;
+    const { svg, w } = svgIn(el, Math.max(40, n * rowH + 6));
     if (!n) { el.classList.add('ops-empty'); return; } el.classList.remove('ops-empty');
     const fmt = opts.fmt || d3.format(',');
     const labW = Math.min(w * 0.45, measure(svg, rows.map((r) => r.label), 12) + 10);
     const valW = measure(svg, rows.map((r) => fmt(r.value) + (r.sub ? '  ' + r.sub : '')), 11) + 10;
     const x = d3.scaleLinear([0, d3.max(rows, (r) => r.value) || 1], [0, Math.max(10, w - labW - valW)]);
-    const g = svg.selectAll('g').data(rows).join('g').attr('transform', (d, i) => `translate(0,${i * rowH + 3})`)
+    // a label wider than its column wraps onto more lines, and its row grows to fit, so names are always shown in full
+    const wrap = (s) => {
+      const max = labW - 10, lines = []; let cur = '';
+      for (let word of String(s).split(/\s+/)) {
+        while (word.length > 1 && textW(svg, word, 12) > max) {   // one word too long for the column breaks where it must
+          if (cur) { lines.push(cur); cur = ''; }
+          let cut = word.length - 1; while (cut > 1 && textW(svg, word.slice(0, cut), 12) > max) cut--;
+          lines.push(word.slice(0, cut)); word = word.slice(cut);
+        }
+        const next = cur ? cur + ' ' + word : word;
+        if (cur && textW(svg, next, 12) > max) { lines.push(cur); cur = word; } else cur = next;
+      }
+      if (cur) lines.push(cur);
+      return lines;
+    };
+    let top = 3;
+    const laid = rows.map((r) => { const lines = wrap(r.label), rh = Math.max(rowH, lines.length * lineH + 8), e = { ...r, lines, rh, top }; top += rh; return e; });
+    svg.attr('viewBox', `0 0 ${w} ${Math.max(40, top + 3)}`);
+    const g = svg.selectAll('g').data(laid).join('g').attr('transform', (d) => `translate(0,${d.top})`)
       .style('cursor', opts.onClick ? 'pointer' : null).on('click', (ev, d) => opts.onClick && opts.onClick(d));
-    g.append('rect').attr('x', 0).attr('y', 0).attr('width', w).attr('height', rowH).attr('fill', (d) => opts.active && opts.active === d.label ? 'var(--cds-chart-grid)' : 'transparent').attr('rx', 4);
-    // a label wider than its column is cut with "…" so it never runs into the bar; hovering the row shows it in full
-    const fit = (s) => { const max = labW - 10; if (textW(svg, s, 12) <= max) return s; let t = s; while (t.length > 1 && textW(svg, t + '…', 12) > max) t = t.slice(0, -1); return t.trimEnd() + '…'; };
+    g.append('rect').attr('x', 0).attr('y', 0).attr('width', w).attr('height', (d) => d.rh).attr('fill', (d) => opts.active && opts.active === d.label ? 'var(--cds-chart-grid)' : 'transparent').attr('rx', 4);
     g.append('title').text((d) => `${d.label} · ${fmt(d.value)}${d.sub ? ' · ' + d.sub : ''}`);
-    // and clipped to the label column, so even a mis-measured label can't be drawn over the bar
-    const clip = 'lab-' + Math.random().toString(36).slice(2);
-    svg.append('defs').append('clipPath').attr('id', clip).append('rect').attr('x', 0).attr('y', 0).attr('width', labW - 6).attr('height', rowH);
-    g.append('text').attr('x', 4).attr('y', rowH / 2 + 4).attr('font-size', 12).attr('fill', 'var(--color-fg)').attr('clip-path', `url(#${clip})`).text((d) => fit(d.label));
-    g.append('rect').attr('x', labW).attr('y', rowH / 2 - 7).attr('height', 14).attr('rx', 4).attr('width', (d) => Math.max(2, x(d.value))).attr('fill', (d) => d.color || dash.colors[0]);
-    g.append('text').attr('x', (d) => labW + Math.max(2, x(d.value)) + 6).attr('y', rowH / 2 + 4).attr('font-size', 11).attr('fill', 'var(--color-fg)').text((d) => fmt(d.value));
-    g.append('text').attr('x', (d) => labW + Math.max(2, x(d.value)) + 6 + textW(svg, fmt(d.value), 11) + 6).attr('y', rowH / 2 + 4).attr('font-size', 11).attr('fill', 'var(--color-fg-muted)').text((d) => d.sub || '');
+    g.append('text').attr('font-size', 12).attr('fill', 'var(--color-fg)').selectAll('tspan').data((d) => d.lines.map((line, i) => ({ line, y: d.rh / 2 + 4 + (i - (d.lines.length - 1) / 2) * lineH }))).join('tspan').attr('x', 4).attr('y', (l) => l.y).text((l) => l.line);
+    g.append('rect').attr('x', labW).attr('y', (d) => d.rh / 2 - 7).attr('height', 14).attr('rx', 4).attr('width', (d) => Math.max(2, x(d.value))).attr('fill', (d) => d.color || dash.colors[0]);
+    g.append('text').attr('x', (d) => labW + Math.max(2, x(d.value)) + 6).attr('y', (d) => d.rh / 2 + 4).attr('font-size', 11).attr('fill', 'var(--color-fg)').text((d) => fmt(d.value));
+    g.append('text').attr('x', (d) => labW + Math.max(2, x(d.value)) + 6 + textW(svg, fmt(d.value), 11) + 6).attr('y', (d) => d.rh / 2 + 4).attr('font-size', 11).attr('fill', 'var(--color-fg-muted)').text((d) => d.sub || '');
   };
 
   /* Donut: parts [{label, value, color}] */

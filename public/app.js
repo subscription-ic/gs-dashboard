@@ -143,6 +143,8 @@
     return out;
   }
 
+  // the feed's reasons carry a code ("21-Item(s) unavailable"); shown without it, so codes with the same wording become one reason
+  const reasonName = (s) => String(s).replace(/^\s*\d+\s*-\s*/, '');
   /* Cancellations per reason and per cancel group (RDC_RCC, RDC_OOS, Tech, FXM, Other) for one scope's rows in the weeks
      `inWeeks` keeps, with each one’s share of all cancellations in that cut. Weekly feed, so a period takes whole weeks. */
   function cancelMix(rows, inWeeks, period) {
@@ -152,7 +154,7 @@
     const out = [];
     for (const level of ['reason', 'cancel_group']) {
       const m = {};
-      for (const r of inPeriod) { const e = (m[r[level]] = m[r[level]] || { orders: 0, value: 0 }); e.orders += N(r.orders); e.value += N(r.value); }
+      for (const r of inPeriod) { const key = level === 'reason' ? reasonName(r.reason) : r[level], e = (m[key] = m[key] || { orders: 0, value: 0 }); e.orders += N(r.orders); e.value += N(r.value); }
       for (const [name, e] of Object.entries(m)) out.push({ period, level: level === 'reason' ? 'reason' : 'group', name, orders: e.orders, value: e.value, pct: total ? r1((100 * e.orders) / total) : null });
     }
     return out;
@@ -586,7 +588,7 @@
       const m = d3.rollups(selI, (v) => d3.sum(v, (r) => N(r.orders)), keyF).sort((a, b) => b[1] - a[1]).slice(0, 10);
       const all = d3.sum(selI, (r) => N(r.orders));
       C.ranked($('c-items'), m.map(([l, c]) => ({ label: l, value: c, sub: state.l1 ? `${d3.format('.0%')(c / (tot.get(l) || 1))} of its complaints` : `${d3.format('.1%')(c / (all || 1))} of all` })), { fmt: F.int });
-      $('items-note').textContent = state.itemsMode === 'category' ? 'menu category from a placeholder column — needs the item master' : state.l1 ? 'share = complaints in this L1 ÷ all complaints on the item' : 'share = complaints on item ÷ all complaints · full period';
+      $('items-note').textContent = state.itemsMode === 'category' ? 'menu category from a placeholder column — needs the item master' : state.l1 ? 'share = complaints in this L1 ÷ all complaints on the item' : 'share = complaints on item ÷ all complaints';
     }
     if (vis('c-concern-weekly')) C.stackedWeekly($('c-concern-weekly'), W.map((w) => ({ d: w.d, parts: { product: w.s.product_concern, service: w.s.service_concern } })), [{ key: 'product', label: 'Product', color: dash.colors[0] }, { key: 'service', label: 'Service', color: dash.colors[1] }]);
 
@@ -598,17 +600,24 @@
     // ---- Output: cancellation
     const canc = rows('cancellations').filter((r) => ids.has(r.restaurant_id) && wk(dayNum(r.week)));
     const cancTot = d3.sum(canc, (r) => N(r.orders));
-    if (vis('c-cancel-reasons')) { const m = d3.rollups(canc, (v) => d3.sum(v, (r) => N(r.orders)), (r) => r.reason).sort((a, b) => b[1] - a[1]); C.ranked($('c-cancel-reasons'), m.map(([l, c]) => ({ label: l, value: cancTot ? (100 * c) / cancTot : 0, sub: F.int(c), color: l === 'Item unavailable' ? dash.colors[3] : dash.colors[0] })), { fmt: F.pct }); }
+    if (vis('c-cancel-reasons')) { const m = d3.rollups(canc, (v) => d3.sum(v, (r) => N(r.orders)), (r) => reasonName(r.reason)).sort((a, b) => b[1] - a[1]); C.ranked($('c-cancel-reasons'), m.map(([l, c]) => ({ label: l, value: cancTot ? (100 * c) / cancTot : 0, sub: F.int(c), color: l === 'Item unavailable' ? dash.colors[3] : dash.colors[0] })), { fmt: F.pct }); }
     const GC = { RDC_RCC: dash.colors[0], RDC_OOS: dash.colors[3], Tech: dash.colors[2], FXM: dash.colors[4], Other: dash.colors[6] };
     if (vis('c-cancel-donut')) { const m = d3.rollups(canc, (v) => d3.sum(v, (r) => N(r.orders)), (r) => r.cancel_group).sort((a, b) => b[1] - a[1]); C.donut($('c-cancel-donut'), m.map(([l, c]) => ({ label: l, value: c, color: GC[l] || dash.colors[7] }))); }
     if (vis('c-cancel-line')) C.line($('c-cancel-line'), pair('cancelled', 'pct'), { fmt: F.pct, y0: true });
     if (vis('c-cancel-weekly')) { const wk = d3.rollups(canc, (v) => Object.fromEntries(d3.rollups(v, (x) => d3.sum(x, (r) => N(r.orders)), (r) => r.cancel_group)), (r) => r.week).sort((a, b) => a[0].localeCompare(b[0])); C.stackedWeekly($('c-cancel-weekly'), wk.map(([w, parts]) => ({ d: toDate(dayNum(w)), parts })), Object.keys(GC).map((k) => ({ key: k, label: k, color: GC[k] })), { h: 150 }); }
     // sale loss by reason: cancelled order value per cancellation reason (weekly feed)
-    if (vis('c-saleloss-reasons')) { const valTot = d3.sum(canc, (r) => N(r.value)); const m = d3.rollups(canc, (v) => [d3.sum(v, (r) => N(r.value)), d3.sum(v, (r) => N(r.orders)), v[0].cancel_group], (r) => r.reason).sort((a, b) => b[1][0] - a[1][0]).slice(0, 10); C.ranked($('c-saleloss-reasons'), m.map(([l, [v, c, g]]) => ({ label: l, value: v, sub: `${d3.format('.0%')(v / (valTot || 1))} · ${F.int(c)} orders`, color: g === 'RDC_OOS' ? dash.colors[3] : dash.colors[0] })), { fmt: F.inr }); }
-    if (vis('c-cancel-items')) { const ic = rows('item_cancels').filter((r) => ids.has(r.restaurant_id)); const all = d3.sum(ic, (r) => N(r.orders)); const m = d3.rollups(ic, (v) => d3.sum(v, (r) => N(r.orders)), (r) => r.item).sort((a, b) => b[1] - a[1]).slice(0, 10); C.ranked($('c-cancel-items'), m.map(([l, c]) => ({ label: l, value: c, sub: `${d3.format('.1%')(c / (all || 1))} · full period` })), { fmt: F.int }); }
+    if (vis('c-saleloss-reasons')) { const valTot = d3.sum(canc, (r) => N(r.value)); const m = d3.rollups(canc, (v) => [d3.sum(v, (r) => N(r.value)), d3.sum(v, (r) => N(r.orders)), v[0].cancel_group], (r) => reasonName(r.reason)).sort((a, b) => b[1][0] - a[1][0]).slice(0, 10); C.ranked($('c-saleloss-reasons'), m.map(([l, [v, c, g]]) => ({ label: l, value: v, sub: `${d3.format('.0%')(v / (valTot || 1))} · ${F.int(c)} ${c === 1 ? 'order' : 'orders'}`, color: g === 'RDC_OOS' ? dash.colors[3] : dash.colors[0] })), { fmt: F.inr }); }
+    if (vis('c-cancel-items')) { const ic = rows('item_cancels').filter((r) => ids.has(r.restaurant_id)); const all = d3.sum(ic, (r) => N(r.orders)); const m = d3.rollups(ic, (v) => d3.sum(v, (r) => N(r.orders)), (r) => r.item).sort((a, b) => b[1] - a[1]).slice(0, 10); C.ranked($('c-cancel-items'), m.map(([l, c]) => ({ label: l, value: c, sub: d3.format('.1%')(c / (all || 1)) })), { fmt: F.int }); }
 
     // ---- Output: refund
-    if (vis('c-refund-reasons')) { const L1C = Object.fromEntries(L1.map(([k], i) => [k, dash.colors[i]])); const m = d3.rollups(comp, (v) => d3.sum(v, (r) => N(r.refund_amt)), (r) => r.l1 + '|' + r.l2).sort((a, b) => b[1] - a[1]).slice(0, 10); C.ranked($('c-refund-reasons'), m.map(([k, v]) => { const [l1, l2] = k.split('|'); return { label: l2, value: v, sub: L1.find((x) => x[0] === l1)[1], color: L1C[l1] }; }), { fmt: F.inr }); }
+    // L1 and L2 each take their own card; an L2 bar has its L1's colour. Not narrowed by a click on the concerns L1 chart.
+    if (vis('c-refund-l1') || vis('c-refund-l2')) {
+      const refundRows = rows('complaints').filter((r) => ids.has(r.restaurant_id) && wk(dayNum(r.week)));
+      const refundTot = d3.sum(refundRows, (r) => N(r.refund_amt)), share = (v) => d3.format('.0%')(v / (refundTot || 1));
+      const L1C = Object.fromEntries(L1.map(([k], i) => [k, dash.colors[i]])), l1Name = (k) => (L1.find((x) => x[0] === k) || [k, k])[1];
+      if (vis('c-refund-l1')) C.ranked($('c-refund-l1'), d3.rollups(refundRows, (v) => d3.sum(v, (r) => N(r.refund_amt)), (r) => r.l1).sort((a, b) => b[1] - a[1]).map(([l1, v]) => ({ label: l1Name(l1), value: v, sub: share(v), color: L1C[l1] })), { fmt: F.inr });
+      if (vis('c-refund-l2')) C.ranked($('c-refund-l2'), d3.rollups(refundRows, (v) => d3.sum(v, (r) => N(r.refund_amt)), (r) => r.l1 + '|' + r.l2).sort((a, b) => b[1] - a[1]).slice(0, 10).map(([k, v]) => { const [l1, l2] = k.split('|'); return { label: l2, value: v, sub: share(v), color: L1C[l1] }; }), { fmt: F.inr });
+    }
     if (vis('c-refund-line')) C.line($('c-refund-line'), [{ name: 'Refund ₹', color: dash.colors[0], points: S.map((x) => ({ d: x.d, v: x.day.s.refund_amt || 0 })) }], { fmt: F.inr, y0: true, area: true, endLabels: false });
 
     // ---- Input: order → pickup time

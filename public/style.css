@@ -49,7 +49,7 @@
 .ops-chain-arrow svg { width: 44px; height: 14px; }
 .ops-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 7.5rem), 1fr)); gap: var(--cds-gap-sm) var(--cds-gap-md); }
 .ops-kpi { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
-.ops-kpi .l { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+.ops-kpi .l { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); min-width: 0; }
 .ops-kpi .v { font-family: var(--font-figures); font-variant-numeric: lining-nums tabular-nums; font-weight: 600; letter-spacing: -0.01em; font-size: 1.45rem; line-height: 1.2; }
 
 
@@ -151,7 +151,7 @@
 .lb-tier h4 { margin: 0 0 2px; font-size: var(--cds-font-size-caption); font-weight: var(--cds-font-weight-medium); display: flex; justify-content: space-between; color: var(--color-fg); }
 .lb-tier h4 small { color: var(--color-fg-muted); font-weight: 400; }
 .lb-m { display: grid; grid-template-columns: minmax(6rem, 1.2fr) auto auto; align-items: center; gap: 2px var(--cds-gap-sm); font-size: var(--cds-font-size-caption); }
-.lb-m .n { color: var(--color-fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-m .n { color: var(--color-fg-muted); }
 .lb-m .v { font-weight: 500; text-align: right; white-space: nowrap; }
 .lb-m .v.bad { color: var(--color-bad); } .lb-m .v.warn { color: var(--color-warn); }
 .lb-m .net { color: var(--color-fg-muted); text-align: right; white-space: nowrap; }
@@ -311,7 +311,7 @@
 .lb-m .n .lb-stars { margin-left: 4px; }
 .lb-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; margin-top: 6px; }
 .lb-stat { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; background: var(--color-panel); border: 1px solid var(--color-border-line); border-radius: 8px; min-width: 0; }
-.lb-stat .n { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-stat .n { font-size: var(--cds-font-size-caption); color: var(--color-fg-muted); }
 .lb-stat .v { font-family: var(--font-figures); font-variant-numeric: lining-nums tabular-nums; font-weight: 700; font-size: 1rem; }
 .lb-stat .dv { align-self: flex-start; font-size: var(--cds-font-size-caption); font-weight: 700; padding: 0 6px; border-radius: 999px; background: var(--color-bg); color: var(--color-fg-muted); }
 .lb-stat .dv.good { background: var(--color-ok-soft); color: var(--color-ok); }
