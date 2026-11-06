@@ -54,7 +54,7 @@
 }
 
 html, body { margin: 0; background: var(--color-page); color: var(--color-fg); }
-:root { --page-gutter: clamp(16px, 3.5vw, 72px); }
+:root { --page-gutter: clamp(16px, calc(14vw - 130px), 120px); }   /* margins grow quickly on wide screens; small laptops keep their width */
 #dash-root { padding: 20px var(--page-gutter) 60px; }
 
 /* loading skeleton the shell normally draws */
