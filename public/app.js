@@ -605,19 +605,30 @@
     // ---- Output: critical
     if (vis('c-crit-donut') && row) C.donut($('c-crit-donut'), [{ label: 'Veg / non-veg', value: row.crit_veg, color: dash.colors[3] }, { label: 'Foreign particle', value: row.crit_foreign, color: dash.colors[4] }, { label: 'Pests', value: row.crit_pests, color: dash.colors[5] }]);
     if (vis('c-crit-weekly')) C.stackedWeekly($('c-crit-weekly'), W.map((w) => ({ d: w.d, parts: { veg: w.s.crit_veg, fp: w.s.crit_foreign, pest: w.s.crit_pests } })), [{ key: 'veg', label: 'Veg / non-veg', color: dash.colors[3] }, { key: 'fp', label: 'Foreign particle', color: dash.colors[4] }, { key: 'pest', label: 'Pests', color: dash.colors[5] }], { h: 150 });
-    if (vis('c-crit-items')) { const m = d3.rollups(items.filter((r) => N(r.critical_orders) > 0), (v) => d3.sum(v, (r) => N(r.critical_orders)), (r) => r.item).sort((a, b) => b[1] - a[1]).slice(0, 8); C.ranked($('c-crit-items'), m.map(([l, c]) => ({ label: l, value: c, color: 'var(--cds-chart-status-critical)' })), { fmt: F.int }); }
+    if (vis('c-crit-items')) {
+      // each item's bar is split by critical type, in the same colours as the donut above
+      const KINDS = [['crit_veg', 'Veg / non-veg', 'veg / non-veg', dash.colors[3]], ['crit_foreign', 'Foreign particle', 'foreign', dash.colors[4]], ['crit_pests', 'Pests', 'pests', dash.colors[5]]];
+      const crit = items.filter((r) => N(r.critical_orders) > 0), split = crit.some((r) => r.crit_veg != null);
+      const m = d3.rollups(crit, (v) => { const parts = KINDS.map(([f, label, short, color]) => ({ label, short, color, value: d3.sum(v, (r) => N(r[f])) })).filter((x) => x.value > 0); return { parts, total: split ? d3.sum(parts, (x) => x.value) : d3.sum(v, (r) => N(r.critical_orders)) }; }, (r) => r.item).sort((a, b) => b[1].total - a[1].total).slice(0, 8);
+      C.ranked($('c-crit-items'), m.map(([l, e]) => (split ? { label: l, value: e.total, parts: e.parts, sub: e.parts.map((x) => `${F.int(x.value)} ${x.short}`).join(' · ') } : { label: l, value: e.total, color: 'var(--cds-chart-status-critical)' })), { fmt: F.int, legend: split ? KINDS.map(([, label, , color]) => ({ label, color })) : null });
+    }
 
     // ---- Output: cancellation
     const canc = rows('cancellations').filter((r) => ids.has(r.restaurant_id) && wk(dayNum(r.week)));
     const cancTot = d3.sum(canc, (r) => N(r.orders));
-    if (vis('c-cancel-reasons')) { const m = d3.rollups(canc, (v) => d3.sum(v, (r) => N(r.orders)), (r) => reasonName(r.reason)).sort((a, b) => b[1] - a[1]); C.ranked($('c-cancel-reasons'), m.map(([l, c]) => ({ label: l, value: cancTot ? (100 * c) / cancTot : 0, sub: F.int(c), color: l === 'Item unavailable' ? dash.colors[3] : dash.colors[0] })), { fmt: F.pct }); }
+    // who cancelled: one set of colours for the donut, the reason cards and the items card
     const GC = { RDC_RCC: dash.colors[0], RDC_OOS: dash.colors[3], Tech: dash.colors[2], FXM: dash.colors[4], Other: dash.colors[6] };
+    if (vis('c-cancel-reasons')) { const m = d3.rollups(canc, (v) => [d3.sum(v, (r) => N(r.orders)), v[0].cancel_group], (r) => reasonName(r.reason)).sort((a, b) => b[1][0] - a[1][0]); C.ranked($('c-cancel-reasons'), m.map(([l, [c, g]]) => ({ label: l, value: cancTot ? (100 * c) / cancTot : 0, sub: F.int(c), color: GC[g] || dash.colors[7] })), { fmt: F.pct }); }
     if (vis('c-cancel-donut')) { const m = d3.rollups(canc, (v) => d3.sum(v, (r) => N(r.orders)), (r) => r.cancel_group).sort((a, b) => b[1] - a[1]); C.donut($('c-cancel-donut'), m.map(([l, c]) => ({ label: l, value: c, color: GC[l] || dash.colors[7] }))); }
     if (vis('c-cancel-line')) C.line($('c-cancel-line'), pair('cancelled', 'pct'), { fmt: F.pct, y0: true });
     if (vis('c-cancel-weekly')) { const wk = d3.rollups(canc, (v) => Object.fromEntries(d3.rollups(v, (x) => d3.sum(x, (r) => N(r.orders)), (r) => r.cancel_group)), (r) => r.week).sort((a, b) => a[0].localeCompare(b[0])); C.stackedWeekly($('c-cancel-weekly'), wk.map(([w, parts]) => ({ d: toDate(dayNum(w)), parts })), Object.keys(GC).map((k) => ({ key: k, label: k, color: GC[k] })), { h: 150 }); }
     // sale loss by reason: cancelled order value per cancellation reason (weekly feed)
-    if (vis('c-saleloss-reasons')) { const valTot = d3.sum(canc, (r) => N(r.value)); const m = d3.rollups(canc, (v) => [d3.sum(v, (r) => N(r.value)), d3.sum(v, (r) => N(r.orders)), v[0].cancel_group], (r) => reasonName(r.reason)).sort((a, b) => b[1][0] - a[1][0]).slice(0, 10); C.ranked($('c-saleloss-reasons'), m.map(([l, [v, c, g]]) => ({ label: l, value: v, sub: `${d3.format('.0%')(v / (valTot || 1))} · ${F.int(c)} ${c === 1 ? 'order' : 'orders'}`, color: g === 'RDC_OOS' ? dash.colors[3] : dash.colors[0] })), { fmt: F.inr }); }
-    if (vis('c-cancel-items')) { const ic = rows('item_cancels').filter((r) => ids.has(r.restaurant_id)); const all = d3.sum(ic, (r) => N(r.orders)); const m = d3.rollups(ic, (v) => d3.sum(v, (r) => N(r.orders)), (r) => r.item).sort((a, b) => b[1] - a[1]).slice(0, 10); C.ranked($('c-cancel-items'), m.map(([l, c]) => ({ label: l, value: c, sub: d3.format('.1%')(c / (all || 1)) })), { fmt: F.int }); }
+    if (vis('c-saleloss-reasons')) { const valTot = d3.sum(canc, (r) => N(r.value)); const m = d3.rollups(canc, (v) => [d3.sum(v, (r) => N(r.value)), d3.sum(v, (r) => N(r.orders)), v[0].cancel_group], (r) => reasonName(r.reason)).sort((a, b) => b[1][0] - a[1][0]).slice(0, 10); C.ranked($('c-saleloss-reasons'), m.map(([l, [v, c, g]]) => ({ label: l, value: v, sub: `${d3.format('.0%')(v / (valTot || 1))} · ${F.int(c)} ${c === 1 ? 'order' : 'orders'}`, color: GC[g] || dash.colors[7] })), { fmt: F.inr }); }
+    if (vis('c-cancel-items')) {
+      const ic = rows('item_cancels').filter((r) => ids.has(r.restaurant_id)), all = d3.sum(ic, (r) => N(r.orders)), split = ic.some((r) => r.cancel_group);
+      const m = d3.rollups(ic, (v) => [d3.sum(v, (r) => N(r.orders)), split ? Object.keys(GC).map((g) => ({ label: g, color: GC[g], value: d3.sum(v.filter((r) => r.cancel_group === g), (r) => N(r.orders)) })).filter((x) => x.value > 0) : null], (r) => r.item).sort((a, b) => b[1][0] - a[1][0]).slice(0, 10);
+      C.ranked($('c-cancel-items'), m.map(([l, [c, parts]]) => ({ label: l, value: c, sub: d3.format('.1%')(c / (all || 1)), parts, color: 'var(--cds-chart-muted)' })), { fmt: F.int, legend: split ? Object.keys(GC).map((g) => ({ label: g, color: GC[g] })) : null });
+    }
 
     // ---- Output: refund
     // L1 and L2 each take their own card; an L2 bar has its L1's colour. Not narrowed by a click on the concerns L1 chart.

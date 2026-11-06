@@ -134,11 +134,14 @@
     const g = svg.selectAll('g').data(laid).join('g').attr('transform', (d) => `translate(0,${d.top})`)
       .style('cursor', opts.onClick ? 'pointer' : null).on('click', (ev, d) => opts.onClick && opts.onClick(d));
     g.append('rect').attr('x', 0).attr('y', 0).attr('width', w).attr('height', (d) => d.rh).attr('fill', (d) => opts.active && opts.active === d.label ? 'var(--cds-chart-grid)' : 'transparent').attr('rx', 4);
-    g.append('title').text((d) => `${d.label} · ${fmt(d.value)}${d.sub ? ' · ' + d.sub : ''}`);
+    g.append('title').text((d) => `${d.label} · ${fmt(d.value)}${d.sub ? ' · ' + d.sub : ''}${d.parts ? ' · ' + d.parts.map((p) => `${p.label} ${fmt(p.value)}`).join(', ') : ''}`);
     g.append('text').attr('font-size', 12).attr('fill', 'var(--color-fg)').selectAll('tspan').data((d) => d.lines.map((line, i) => ({ line, y: d.rh / 2 + 4 + (i - (d.lines.length - 1) / 2) * lineH }))).join('tspan').attr('x', 4).attr('y', (l) => l.y).text((l) => l.line);
-    g.append('rect').attr('x', labW).attr('y', (d) => d.rh / 2 - 7).attr('height', 14).attr('rx', 4).attr('width', (d) => Math.max(2, x(d.value))).attr('fill', (d) => d.color || dash.colors[0]);
+    // a row's bar is one colour, or split by its `parts`, each with its own colour
+    g.selectAll('rect.seg').data((d) => { let at = 0; return (d.parts || [{ value: d.value, color: d.color || dash.colors[0] }]).map((p) => { const s = { x: labW + at, w: x(p.value), color: p.color, rh: d.rh }; at += s.w; return s; }); })
+      .join('rect').attr('class', 'seg').attr('x', (s) => s.x).attr('y', (s) => s.rh / 2 - 7).attr('height', 14).attr('rx', 4).attr('width', (s) => Math.max(2, s.w)).attr('fill', (s) => s.color);
     g.append('text').attr('x', (d) => labW + Math.max(2, x(d.value)) + 6).attr('y', (d) => d.rh / 2 + 4).attr('font-size', 11).attr('fill', 'var(--color-fg)').text((d) => fmt(d.value));
     g.append('text').attr('x', (d) => labW + Math.max(2, x(d.value)) + 6 + textW(svg, fmt(d.value), 11) + 6).attr('y', (d) => d.rh / 2 + 4).attr('font-size', 11).attr('fill', 'var(--color-fg-muted)').text((d) => d.sub || '');
+    if (opts.legend) d3.select(el).append('div').attr('class', 'ops-legend').selectAll('span').data(opts.legend).join('span').html((l) => `<i style="background:${l.color}"></i>${l.label}`);
   };
 
   /* Donut: parts [{label, value, color}] */
