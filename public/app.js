@@ -274,12 +274,12 @@
   tiles('chain-outcome-kpis', [
     { label: 'Rating', field: 'rating', fmt: 'rating', big: true, stars: true }, { label: 'Ratings', field: 'rating_n', fmt: 'int', nostatus: true },
     { label: 'ADT', field: 'adt', fmt: 'num1', nostatus: true, tip: () => 'Average daily transactions: delivered orders per outlet per selling day' }, { label: 'ADS (est.)', field: 'ads', fmt: 'inr', nostatus: true, tip: () => 'Average daily sales per outlet: ADT × average order value (estimate — no sales feed yet)' },
-    { label: 'Value to guest', field: 'guest_value', fmt: 'inr', nostatus: true, tip: () => 'Refunds + cancelled order value' },
+    { label: 'Total sale loss', field: 'guest_value', fmt: 'inr', nostatus: true, tip: () => 'Refunds + cancelled order value' },
   ]);
   // Group summaries (compact, no delta)
   const SUM = { rating: [{ label: 'Rating', field: 'rating', fmt: 'rating' }, { label: 'Ratings', field: 'rating_n', fmt: 'int', nostatus: true }],
     saleloss: [{ label: 'Cancelled ₹', field: 'sale_loss', fmt: 'inr', nostatus: true }, { label: 'Cancelled', field: 'cancel_pct', fmt: 'pct' }],
-    guestvalue: [{ label: 'To guest ₹', field: 'guest_value', fmt: 'inr', nostatus: true }],
+    guestvalue: [{ label: 'Total sale loss ₹', field: 'guest_value', fmt: 'inr', nostatus: true }],
     concerns: [{ label: 'Total', field: 'complaint_pct', fmt: 'pct' }, { label: 'Product', field: 'product_pct', fmt: 'pct' }, { label: 'Service', field: 'service_pct', fmt: 'pct' }, { label: 'Concerns', field: 'complaints', fmt: 'int', nostatus: true }],
     critical: [{ label: 'Incidents', field: 'crit_total', fmt: 'int' }],
     cancel: [{ label: 'Cancelled', field: 'cancel_pct', fmt: 'pct' }, { label: 'Completion', field: 'completion_pct', fmt: 'pct' }],
@@ -296,7 +296,7 @@
   // Section tiles
   tiles('t-rating', [{ label: 'Average rating', field: 'rating', fmt: 'rating', big: true, stars: true }, { label: 'Number of ratings', field: 'rating_n', fmt: 'int', nostatus: true }, { label: 'Orders', field: 'orders', fmt: 'int', nostatus: true }]);
   tiles('t-saleloss', [{ label: 'Cancelled order value', field: 'sale_loss', fmt: 'inr', big: true, nostatus: true }, { label: 'Cancelled orders', field: 'cancelled', fmt: 'int', nostatus: true, delta: false }, { label: 'Cancelled %', field: 'cancel_pct', fmt: 'pct' }]);
-  tiles('t-guestvalue', [{ label: 'Refunds + cancelled value', field: 'guest_value', fmt: 'inr', big: true, nostatus: true }, { label: 'IGCC refunds', field: 'refund', fmt: 'inr', nostatus: true }, { label: 'Cancelled value', field: 'sale_loss', fmt: 'inr', nostatus: true }]);
+  tiles('t-guestvalue', [{ label: 'Total sale loss', field: 'guest_value', fmt: 'inr', big: true, nostatus: true, tip: () => 'Refunds + cancelled order value' }, { label: 'IGCC refunds', field: 'refund', fmt: 'inr', nostatus: true }, { label: 'Cancelled value', field: 'sale_loss', fmt: 'inr', nostatus: true }]);
   tiles('t-concerns', [{ label: 'Product concern (quality, quantity)', field: 'product_pct', fmt: 'pct', big: true }, { label: 'Service concern (packaging, missing, wrong)', field: 'service_pct', fmt: 'pct', big: true }, { label: 'Total concerns', field: 'complaint_pct', fmt: 'pct' }, { label: 'Total concerns (count)', field: 'complaints', fmt: 'int', nostatus: true }]);
   tiles('t-concern-count', [{ label: 'Unique concern orders', field: 'unique', fmt: 'int', nostatus: true, delta: false }, { label: 'Unique %', field: 'unique_pct', fmt: 'pct', nostatus: true }, { label: 'Multiple concern orders', field: 'multi', fmt: 'int', nostatus: true, delta: false }, { label: 'Multiple %', field: 'multi_pct', fmt: 'pct' }]);
   tiles('t-cancel', [{ label: 'Cancelled %', field: 'cancel_pct', fmt: 'pct', big: true }, { label: 'Order completion', field: 'completion_pct', fmt: 'pct' }, { label: 'Cancelled orders', field: 'cancelled', fmt: 'int', nostatus: true, delta: false }, { label: 'Top reason', field: 'pct', fmt: 'pct', source: 'cancel_mix', level: 'reason', name: '', nostatus: true, delta: false, top: true }]);
@@ -334,7 +334,7 @@
   const NA = {
     rating: [['Product-wise rating', 'Swiggy rating feed has no item column']],
     saleloss: [['Sale loss %', 'Total GMV not in DB (payout file)']],
-    guestvalue: [['Value to guest % of sales', 'Needs GMV from the payout file']],
+    guestvalue: [['Total sale loss % of sales', 'Needs GMV from the payout file']],
     concerns: [['Top items by menu category', 'Partial: needs item → menu-category master; rows without a category show as Uncategorised'], ['Complaint resolution TAT (open / close / no response)', 'No complaint-resolution timestamps in IGCC']],
     critical: [['Multiple critical per order', 'Needs order-level complaint rows'], ['Items by menu category', 'Needs item master']],
     cancel: [['Cancelled before / after MFR', 'Cancelled orders have no timestamp row'], ['Avg cancellation time per reason', 'RDC has date only, no cancellation timestamp']],
@@ -557,7 +557,7 @@
     const pair = (key, kind) => { const val = (x) => (kind === 'w' ? x.w(key) : kind === 'pct' ? x.pct(key) : x[kind]); const ser = [{ name, color: dash.colors[0], points: S.map((x) => ({ d: x.d, v: val(x) })) }]; if (!isNet) ser.push({ name: 'Network', muted: true, points: SN.map((x) => ({ d: x.d, v: val(x) })) }); return ser; };
     const weekendDays = S.filter((x) => x.d.getUTCDay() === 0 || x.d.getUTCDay() === 6).map((x) => x.d);
 
-    // ---- Outcome: rating, daily sales, value to guest · Output: sale loss per day
+    // ---- Outcome: rating, daily sales, total sale loss · Output: sale loss per day
     if (vis('c-adt-line')) C.line($('c-adt-line'), pair('adt', 'adt'), { fmt: F.num1, y0: true });
     if (vis('c-rating-line')) C.line($('c-rating-line'), pair('rating', 'rating'), { fmt: F.rating, h: 200, ref: { v: 4.3, label: 'target 4.30' } });
     if (vis('c-saleloss-line')) C.line($('c-saleloss-line'), [{ name: 'Cancelled ₹', color: dash.colors[0], points: S.map((x) => ({ d: x.d, v: x.day.s.cancelled_value || 0 })) }], { fmt: F.inr, y0: true, area: true, endLabels: false });
@@ -646,7 +646,7 @@
 
   /* ---------- leaderboard ---------- */
   const LBT = {
-    outcome: [['rating', 'Rating', 'rating'], ['adt', 'ADT', 'num1'], ['ads', 'ADS (est.)', 'inr'], ['rating_n', '# ratings', 'int'], ['guest_value', 'Value to guest ₹', 'inr']],
+    outcome: [['rating', 'Rating', 'rating'], ['adt', 'ADT', 'num1'], ['ads', 'ADS (est.)', 'inr'], ['rating_n', '# ratings', 'int'], ['guest_value', 'Total sale loss ₹', 'inr']],
     output: [['complaint_pct', 'Total concerns', 'pct'], ['product_pct', 'Product concern', 'pct'], ['service_pct', 'Service concern', 'pct'], ['crit_total', 'Critical incidents', 'int'], ['cancel_pct', 'Cancelled', 'pct'], ['sale_loss', 'Sale loss (cancelled ₹)', 'inr'], ['refund', 'Refunds ₹', 'inr']],
     input: [['kpt', 'KPT', 'min'], ['kpt_peak', 'Peak KPT', 'min'], ['kpt_gt10_pct', 'Orders > 10 min', 'pct'], ['vis_pct', 'Visibility', 'pct'], ['mfr_correct_pct', 'Correct MFR', 'pct'], ['handover', 'Handover', 'min'], ['wait_arr_pct', 'Rider waited for food', 'pct'], ['tat', 'Order → pickup', 'min']],
   };

@@ -205,7 +205,8 @@
 
 /* ---------- visual polish: bolder type, brighter accents, highlighted changes ---------- */
 /* headings: bold sans instead of light serif */
-.ops-head h1 { font-family: var(--font-anthropic-sans); font-weight: 600; font-size: 1.6rem; letter-spacing: -0.01em; }
+.ops-head h1 { font-family: var(--font-anthropic-sans); font-weight: 700; font-size: 1.68rem; letter-spacing: -0.02em; }
+.ops-head h1 span { color: var(--color-accent); }
 .ops-sub { display: inline-flex; align-items: center; padding: 3px 10px; border-radius: 999px; background: var(--color-accent-soft); color: var(--color-accent); font-weight: 600; }
 .tier-head h2, .ops-board-head h2 { font-family: var(--font-anthropic-sans); font-weight: 600; font-size: 1.3rem; }
 .tier-head { border-left-width: 5px; }
