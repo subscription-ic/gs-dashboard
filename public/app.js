@@ -96,12 +96,13 @@
   }
 
   /* Headline KPIs for one scope's daily rows over the `period` days ending `end`, for one day type, with the prior period
-     (the same number of days just before) and its change. */
-  function kpiFor(rows, end, period, daytype) {
+     (the same number of days just before, or the `prior` {start, end} days when given) and its change. */
+  function kpiFor(rows, end, period, daytype, prior) {
     const N = (x) => +x || 0, r2 = (v) => Math.round(v * 100) / 100;
     const dt = (r) => daytype === 'all' || (daytype === 'weekend') === (N(r.is_weekend) === 1);
     const cur = kpiAgg(rows.filter((r) => dt(r) && dayNum(r.day) > end - period && dayNum(r.day) <= end));
-    const prevRows = rows.filter((r) => dt(r) && dayNum(r.day) > end - 2 * period && dayNum(r.day) <= end - period);
+    const [prevFrom, prevTo] = prior ? [prior.start, prior.end] : [end - 2 * period + 1, end - period];
+    const prevRows = rows.filter((r) => dt(r) && dayNum(r.day) >= prevFrom && dayNum(r.day) <= prevTo);
     const prev = prevRows.length ? kpiAgg(prevRows) : null;
     const row = Object.assign({ period, daytype }, cur);
     for (const k of KPI_DELTAS) { row[k + '_prev'] = prev ? prev[k] : null; row[k + '_d'] = prev && cur[k] != null && prev[k] != null ? r2(cur[k] - prev[k]) : null; }
@@ -168,7 +169,7 @@
   const TABS = ['overview', 'leaderboard', 'input', 'output', 'outcome'];
   const state = { l1: null, itemsMode: 'same', lbSort: 'rating', lbOrder: 'worst', lbRatingPicked: false, open: new Set(), ideal: 18, lbLimit: 50, tab: TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'overview' };
   let restaurants = [], byId = {};
-  const params = () => { const p = dash.params(); return { brand: p.brand || [], zone: p.zone || [], state: p.state || [], city: p.city || [], outlet: p.outlet || [], period: +(p.period || 28), daytype: p.daytype || 'all', from: p.from || '', to: p.to || '' }; };
+  const params = () => { const p = dash.params(); return { brand: p.brand || [], zone: p.zone || [], state: p.state || [], city: p.city || [], outlet: p.outlet || [], period: +(p.period || 28), mtd: !!p.mtd, daytype: p.daytype || 'all', from: p.from || '', to: p.to || '' }; };
   const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/"/g, '&quot;');
 
   /* State of each city in the outlet master (the master has no state column). Delhi and Chandigarh are union territories;
@@ -353,7 +354,7 @@
   Object.entries(AVAIL).forEach(([g, [a, b]]) => { $('avail-' + g).textContent = `${a} of ${b} sub-metrics`; });
 
   /* ---------- controls ---------- */
-  const setDefaults = () => dash.setParams({ brand: [], zone: [], state: [], city: [], outlet: [], period: 28, daytype: 'all', from: '', to: '' });
+  const setDefaults = () => dash.setParams({ brand: [], zone: [], state: [], city: [], outlet: [], period: 28, mtd: false, daytype: 'all', from: '', to: '' });
 
   /* checkbox drop-down for one filter; returns update(options [{v, l, sub}], selected) */
   const CHEV = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 6l5 5 5-5" fill="none" stroke="currentColor" stroke-width="1.5"/></svg>';
@@ -393,9 +394,9 @@
   document.addEventListener('click', (e) => { if (!e.target.closest('.ops-ms')) closeMenus(); });
   const seg = (id, name, onPick) => $(id).addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; onPick ? onPick(b.dataset.v) : dash.setParams({ [name]: name === 'period' ? +b.dataset.v : b.dataset.v }); });
   // the leaderboard rating stays overall until the viewer picks a period or dates, even the 4 weeks already selected
-  seg('f-period', 'period', (v) => { state.lbRatingPicked = true; dash.setParams({ period: +v, from: '', to: '' }); redraw(); }); seg('f-daytype', 'daytype');
+  seg('f-period', 'period', (v) => { state.lbRatingPicked = true; dash.setParams(v === 'mtd' ? { mtd: true, from: '', to: '' } : { mtd: false, period: +v, from: '', to: '' }); redraw(); }); seg('f-daytype', 'daytype');
   // custom date range: both ends needed; picking one end keeps the other from the window on screen
-  const onDate = () => { let f = $('f-from').value, t = $('f-to').value; if (!f || !t) return; if (f > t) [f, t] = [t, f]; state.lbRatingPicked = true; dash.setParams({ from: f, to: t }); };
+  const onDate = () => { let f = $('f-from').value, t = $('f-to').value; if (!f || !t) return; if (f > t) [f, t] = [t, f]; state.lbRatingPicked = true; dash.setParams({ mtd: false, from: f, to: t }); };
   $('f-from').addEventListener('change', onDate); $('f-to').addEventListener('change', onDate);
   seg('lb-order', 'order', (v) => { state.lbOrder = v; state.lbLimit = 50; redraw(); });
   $('f-reset').addEventListener('click', () => { state.lbRatingPicked = false; dash.resetParams(); setDefaults(); state.l1 = null; });
@@ -429,19 +430,28 @@
   const toDate = (n) => new Date(n * 864e5);
   const inDaytype = (r, dt) => dt === 'all' || (dt === 'weekend') === (N(r.is_weekend) === 1);
 
-  /* ---------- the date window: a preset (last 7 / 28 / 84 days to the last day of data) or a custom from–to ---------- */
+  /* ---------- the date window: a preset (last 7 / 28 / 84 days to the last day of data), month to date, or a custom from–to ---------- */
   let dataStart = 0, dataEnd = 0;   // first / last day in the daily feed, set by draw()
+  const utcDay = (y, m, d) => Date.UTC(y, m, d) / 864e5;
   function resolve(p) {
-    const custom = !!(p.from && p.to), end = custom ? dayNum(p.to) : dataEnd;
+    const custom = !!(p.from && p.to);
+    if (p.mtd && !custom && dataEnd) {
+      // the latest month of data (not today's month, which may have no data yet), against the same dates of the month before;
+      // a shorter month before stops at its last day (31 Mar compares with 1–28 Feb)
+      const last = toDate(dataEnd), y = last.getUTCFullYear(), m = last.getUTCMonth(), start = utcDay(y, m, 1);
+      const prevDays = toDate(utcDay(y, m, 0)).getUTCDate();
+      return Object.assign(p, { custom: true, end: dataEnd, start, period: dataEnd - start + 1, prior: { start: utcDay(y, m - 1, 1), end: utcDay(y, m - 1, Math.min(last.getUTCDate(), prevDays)) } });
+    }
+    const end = custom ? dayNum(p.to) : dataEnd;
     const period = custom ? Math.max(1, end - dayNum(p.from) + 1) : p.period;
-    return Object.assign(p, { custom, end, period, start: end - period + 1 });
+    return Object.assign(p, { mtd: false, custom, end, period, start: end - period + 1 });
   }
   const isoDay = (n) => toDate(n).toISOString().slice(0, 10);
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const fmtDay = (n, year) => { const d = toDate(n); return `${d.getUTCDate()} ${MON[d.getUTCMonth()]}${year ? ' ' + d.getUTCFullYear() : ''}`; };
   const winRange = (p) => `${fmtDay(p.start)} – ${fmtDay(p.end, true)}`;
-  const winLabel = (p) => (p.custom ? `${winRange(p)} (${p.period} days)` : PERIOD_LABEL[p.period]);
-  const priorLabel = (p) => (p.custom ? `prior ${p.period} days` : 'prior ' + PERIOD_LABEL[p.period].replace('last ', ''));
+  const winLabel = (p) => (p.mtd ? `MTD (${winRange(p)})` : p.custom ? `${winRange(p)} (${p.period} days)` : PERIOD_LABEL[p.period]);
+  const priorLabel = (p) => (p.mtd ? `${fmtDay(p.prior.start)} – ${fmtDay(p.prior.end)}` : p.custom ? `prior ${p.period} days` : 'prior ' + PERIOD_LABEL[p.period].replace('last ', ''));
   // weekly feeds (complaints, cancellations) can only be cut by whole weeks: a preset takes the last weeks before
   // `presetEnd`, a custom range every week it touches
   const inWeeks = (p, presetEnd) => (w) => (p.custom ? w <= p.end && w + 6 >= p.start : w > presetEnd - p.period);
@@ -450,7 +460,7 @@
   function customKpis(daily, p) {
     const known = new Set(restaurants.map((r) => r.restaurant_id)), byOutlet = d3.group(daily, (r) => r.restaurant_id);
     const scopes = [['all', daily.filter((r) => known.has(r.restaurant_id))], ...restaurants.map((r) => [r.restaurant_id, byOutlet.get(r.restaurant_id) || []])];
-    return scopes.map(([scope, rs]) => Object.assign({ scope }, kpiFor(rs, p.end, p.period, p.daytype)));
+    return scopes.map(([scope, rs]) => Object.assign({ scope }, kpiFor(rs, p.end, p.period, p.daytype, p.prior)));
   }
 
 
@@ -498,8 +508,8 @@
     const ready = ['daily', 'restaurants', 'kpis'].every(ok);
     document.querySelectorAll('.ops-kpi .v, .ops-badge').forEach((el) => el.classList.toggle('dash-skeleton', !ready && dash.data('daily').status === 'loading'));
     // controls reflect params; the date inputs always show the window on screen
-    $('f-period').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', !p.custom && +b.dataset.v === p.period));
-    $('f-dates').dataset.active = String(p.custom);
+    $('f-period').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', p.mtd ? b.dataset.v === 'mtd' : !p.custom && +b.dataset.v === p.period));
+    $('f-dates').dataset.active = String(p.custom && !p.mtd);
     if (daily.length) [['f-from', p.start], ['f-to', p.end]].forEach(([id, n]) => { const i = $(id); i.min = isoDay(dataStart); i.max = isoDay(dataEnd); if (document.activeElement !== i) i.value = isoDay(n); });
     $('f-daytype').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === p.daytype));
     $('lb-order').querySelectorAll('button').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === state.lbOrder));    document.querySelectorAll('[data-items]').forEach((c) => c.setAttribute('aria-pressed', c.dataset.items === state.itemsMode));
@@ -526,13 +536,13 @@
 
     const cancAll = rows('cancellations'), hourlyAll = rows('hourly'), end = p.end;
     // network and single outlets: precomputed in `kpis` for the presets, computed here for a custom range
-    const kp = !p.custom ? rows('kpis') : daily.length && restaurants.length ? cached('kpc', [daily, restaurants, p.end, p.period, p.daytype], () => customKpis(daily, p)) : [];
+    const kp = !p.custom ? rows('kpis') : daily.length && restaurants.length ? cached('kpc', [daily, restaurants, p.end, p.period, p.daytype, p.mtd], () => customKpis(daily, p)) : [];
     const inSel = (r) => info.ids.has(r.restaurant_id);
     const K = (scope) => kp.find((r) => r.scope === scope && +r.period === p.period && r.daytype === p.daytype) || null;
     const net = K('all');
     // any other selection is aggregated here
     const row = !info.any ? net : info.single ? K(info.single)
-      : daily.length ? cached('row', [daily, restaurants, info.selKey, p.end, p.period, p.daytype], () => Object.assign({ scope: 'selection' }, kpiFor(daily.filter(inSel), end, p.period, p.daytype))) : null;
+      : daily.length ? cached('row', [daily, restaurants, info.selKey, p.end, p.period, p.daytype, p.mtd], () => Object.assign({ scope: 'selection' }, kpiFor(daily.filter(inSel), end, p.period, p.daytype, p.prior))) : null;
     const cm = cancAll.length ? cached('cm', [cancAll, restaurants, info.selKey, p.custom, p.end, p.period], () => cancelMix(cancAll.filter(inSel), inWeeks(p, d3.max(cancAll, (r) => dayNum(r.week)) + 6), p.period)) : [];
     const hc = cached('hc', [hourlyAll, restaurants, info.selKey], () => hourlyCuts(hourlyAll.filter(inSel)));
     const topReason = cm.filter((r) => r.level === 'reason').sort((a, b) => b.pct - a.pct)[0];
